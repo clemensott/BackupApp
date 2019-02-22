@@ -1,19 +1,70 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace BackupApp
 {
-    public class OffsetIntervalViewModel : OffsetInterval, INotifyPropertyChanged
+    public class OffsetIntervalViewModel : INotifyPropertyChanged
     {
         string nextBackupTimeText, intervalText;
 
-        private bool IsViewModel { get { return this == ViewModel.Current.BackupTimes; } }
+        private OffsetInterval @base;
 
-        public DateTime NextDateTime
+        public OffsetInterval Base { get; set; }
+
+        public long OffsetTicks
+        {
+            get => Base.OffsetTicks;
+            set
+            {
+                if (value == Base.OffsetTicks) return;
+
+                Base.OffsetTicks = value;
+                OnPropertyChanged(nameof(Base.OffsetTicks));
+            }
+        }
+
+
+        public long IntervalTicks
+        {
+            get => Base.IntervalTicks;
+            set
+            {
+                if (value == Base.IntervalTicks) return;
+
+                Base.IntervalTicks = value;
+                OnPropertyChanged(nameof(Base.IntervalTicks));
+            }
+        }
+
+
+        public TimeSpan Offset
+        {
+            get => Base.Offset;
+            set
+            {
+                if (value == Base.Offset) return;
+
+                Base.Offset = value;
+                OnPropertyChanged(nameof(Base.Offset));
+            }
+        }
+
+
+        public TimeSpan Interval
+        {
+            get => Base.Interval;
+            set
+            {
+                if (value == Base.Interval) return;
+
+                Base.Interval = value;
+                OnPropertyChanged(nameof(Base.Interval));
+            }
+        }
+
+
+        public DateTime Next
         {
             get { return GetNextDateTime(); }
             set
@@ -28,10 +79,10 @@ namespace BackupApp
 
         public DateTime NextDate
         {
-            get { return NextDateTime.Date; }
+            get { return Next.Date; }
             set
             {
-                if (SetOffset(value.Add(NextDateTime.TimeOfDay))) return;
+                if (SetOffset(value.Add(Next.TimeOfDay))) return;
 
                 UpdateNext();
             }
@@ -54,10 +105,7 @@ namespace BackupApp
             }
         }
 
-        public string TimeToNextBackupText
-        {
-            get { return ConvertTimeSpanToStringLong(NextDateTime - DateTime.Now); }
-        }
+        public string TimeToNextBackupText { get { return ConvertTimeSpanToStringLong(Next - DateTime.Now); } }
 
         public string IntervalTextShort
         {
@@ -69,14 +117,14 @@ namespace BackupApp
                 if (value == intervalText) return;
 
                 intervalText = value;
-                OnPropertyChanged("IntervalTextShort");
+                OnPropertyChanged(nameof(IntervalTextShort));
 
                 if (!TryConvertStringToTimeSpan(value, out timeSpan)) return;
 
                 Interval = timeSpan;
                 SetAutoNextTimeTextShort();
 
-                OnPropertyChanged("Interval");
+                OnPropertyChanged(nameof(Interval));
                 UpdateNext();
             }
         }
@@ -85,11 +133,12 @@ namespace BackupApp
 
         public OffsetIntervalViewModel() : this(new OffsetInterval())
         {
-
         }
 
-        public OffsetIntervalViewModel(OffsetInterval offsetInterval) : base(offsetInterval)
+        public OffsetIntervalViewModel(OffsetInterval offsetInterval)
         {
+            Base = offsetInterval;
+
             SetAutoNextTimeTextShort();
             SetAutoIntervalTextShort();
         }
@@ -175,7 +224,7 @@ namespace BackupApp
 
         public void SetAutoNextTimeTextShort()
         {
-            NextBackupTimeTextShort = ConvertTimeSpanToStringShort(NextDateTime.TimeOfDay);
+            NextBackupTimeTextShort = ConvertTimeSpanToStringShort(Next.TimeOfDay);
         }
 
         public void SetAutoIntervalTextShort()
@@ -185,13 +234,9 @@ namespace BackupApp
 
         public void UpdateNext()
         {
-            if (!ViewModel.IsLoaded) return;
-
-            OnPropertyChanged("NextBackupTimeTextShort");
-            OnPropertyChanged("NextDate");
-            OnPropertyChanged("NextDateTime");
-
-            ViewModel.Current.UpdateNextBackupDateTimeWithIntervalText();
+            OnPropertyChanged(nameof(NextBackupTimeTextShort));
+            OnPropertyChanged(nameof(NextDate));
+            OnPropertyChanged(nameof(Next));
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
@@ -201,6 +246,16 @@ namespace BackupApp
             if (PropertyChanged == null) return;
 
             PropertyChanged(this, new PropertyChangedEventArgs(name));
+        }
+
+        public static explicit operator OffsetInterval(OffsetIntervalViewModel oivm)
+        {
+            return oivm.Base;
+        }
+
+        public static explicit operator OffsetIntervalViewModel(OffsetInterval io)
+        {
+            return new OffsetIntervalViewModel(io);
         }
     }
 }

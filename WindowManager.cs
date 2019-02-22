@@ -1,74 +1,67 @@
-﻿using Microsoft.Win32;
-using System;
+﻿using System;
 using System.ComponentModel;
 using System.Drawing;
 using System.IO;
-using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Forms;
 using System.Windows.Media.Imaging;
 
 namespace BackupApp
 {
-    class WindowManager
+    class WindowManager : INotifyPropertyChanged
     {
-        private static WindowManager instance;
-
-        public static WindowManager Current
-        {
-            get
-            {
-                if (instance == null) instance = new WindowManager();
-
-                return instance;
-            }
-        }
-
-        private DateTime backupStartedDateTime;
-        private BitmapImage icon;
         private NotifyIcon notifyIcon;
         private IContainer components;
-        private MainWindow mainWindow;
-        private BackupWindow backupWindow;
+        private readonly MainWindow mainWindow;
+        private readonly BackupWindow backupWindow;
+        private readonly ViewModel viewModel;
 
-        public bool IsLoaded
+        public BitmapImage Icon { get; private set; }
+
+        public BackupTask CurrentBackupTask
         {
-            get
+            get { return backupWindow.CurrentBackupTask; }
+            set
             {
-                if (mainWindow == null) return false;
-                if (Thread.CurrentThread == mainWindow.Dispatcher.Thread) return mainWindow.IsLoaded;
+                backupWindow.CurrentBackupTask = value;
 
-                bool isLoaded = false;
-
-                mainWindow.Dispatcher.BeginInvoke((Action)(() => { isLoaded = mainWindow.IsLoaded; })).Wait();
-
-                return isLoaded;
+                if (viewModel.IsHidden) HideWindows();
+                else ShowBackupWindow();
             }
         }
 
-        public BitmapImage Icon { get { return icon; } }
-
-        private WindowManager()
+        public WindowManager(MainWindow mainWindow, ViewModel viewModel)
         {
-            backupWindow = new BackupWindow();
-
-            backupWindow.StateChanged += BackupWindow_StateChanged;
-
             try
             {
-                icon = new BitmapImage(new Uri(Path.GetFullPath("Backomat.ico")));
-
-                backupWindow.Icon = icon;
+                Icon = new BitmapImage(new Uri(Path.GetFullPath("Backomat.ico")));
             }
             catch
             {
-                icon = null;
+                Icon = null;
             }
 
             SetNotifyIcon();
             SetBalloonTip();
 
-            SystemEvents.PowerModeChanged += OnPowerChange;
+            this.mainWindow = mainWindow;
+            mainWindow.Activated += MainWindow_Activated;
+            mainWindow.StateChanged += MainWindow_StateChanged;
+            mainWindow.Closing += MainWindow_Closing;
+
+            backupWindow = new BackupWindow();
+            backupWindow.StateChanged += BackupWindow_StateChanged;
+
+            if (Icon != null)
+            {
+                mainWindow.Icon = Icon;
+                backupWindow.Icon = Icon;
+            }
+
+            this.viewModel = viewModel;
+
+            if (viewModel.IsHidden) HideWindows();
         }
 
         private void SetNotifyIcon()
@@ -84,9 +77,8 @@ namespace BackupApp
 
         private void NotifyIcon_MouseMove(object sender, System.Windows.Forms.MouseEventArgs e)
         {
-            if (BackupManager.Current.IsBackuping) notifyIcon.Text = "Is Backuping";
-            else notifyIcon.Text = string.Format("Next Backup in: {0}",
-                ViewModel.Current.BackupTimes.TimeToNextBackupText);
+            if (CurrentBackupTask != null && CurrentBackupTask.IsBackuping) notifyIcon.Text = "Is Backuping";
+            else notifyIcon.Text = string.Format("Next Backup in: {0}", viewModel.BackupTimes.TimeToNextBackupText);
         }
 
         private void NotifyIcon_DoubleClick(object sender, EventArgs e)
@@ -107,13 +99,13 @@ namespace BackupApp
 
         private void ShowCurrentWindow()
         {
-            if (!BackupManager.Current.IsBackuping) ShowWindow(mainWindow);
+            if (CurrentBackupTask?.IsBackuping != true) ShowWindow(mainWindow);
             else ShowWindow(backupWindow);
         }
 
         private void ShowWindow(Window window)
         {
-            ViewModel.Current.IsHidden = false;
+            viewModel.IsHidden = false;
 
             window.Show();
 
@@ -125,7 +117,7 @@ namespace BackupApp
 
         private void HideWindows()
         {
-            ViewModel.Current.IsHidden = true;
+            viewModel.IsHidden = true;
 
             HideWindow(mainWindow);
             HideWindow(backupWindow);
@@ -139,30 +131,10 @@ namespace BackupApp
             window.Hide();
         }
 
-        private void OnPowerChange(object s, PowerModeChangedEventArgs e)
-        {
-            Thread.Sleep(TimeSpan.FromSeconds(10));
-
-            int threadID = System.Threading.Thread.CurrentThread.ManagedThreadId;
-            DebugEvent.SaveText("OnPowerChange", "ThreadID: " + threadID, e.Mode);
-
-            if (e.Mode == PowerModes.Resume) BackupManager.Current.CheckForBackup();
-        }
-
-        public void SetMainWindow(MainWindow window)
-        {
-            mainWindow = window;
-            mainWindow.Activated += MainWindow_Activated;
-            mainWindow.StateChanged += MainWindow_StateChanged;
-            mainWindow.Closing += MainWindow_Closing;
-
-            if (icon != null) mainWindow.Icon = icon;
-        }
-
         private void MainWindow_Activated(object sender, EventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine(ViewModel.Current.IsHidden);
-            if (ViewModel.Current.IsHidden) HideWindows();
+            System.Diagnostics.Debug.WriteLine(viewModel.IsHidden);
+            if (viewModel.IsHidden) HideWindows();
         }
 
         private void MainWindow_StateChanged(object sender, EventArgs e)
@@ -172,7 +144,7 @@ namespace BackupApp
 
         private void MainWindow_Closing(object sender, CancelEventArgs e)
         {
-            BackupManager.Current.Close();
+            viewModel.Close();
 
             if (components != null) components.Dispose();
             if (notifyIcon != null) notifyIcon.Dispose();
@@ -184,15 +156,13 @@ namespace BackupApp
             if (backupWindow.WindowState == WindowState.Minimized) HideWindows();
         }
 
-        public void ShowBackupWindow()
+        public async Task ShowBackupWindow()
         {
-            foreach (BackupItem item in ViewModel.Current.BackupItems) item.BeginBackup();
-
-            backupWindow.Dispatcher.BeginInvoke((Action)(() =>
+            await backupWindow.Dispatcher.BeginInvoke((Action)(() =>
             {
-                if (ViewModel.Current.IsHidden)
+                if (viewModel.IsHidden)
                 {
-                    int itemsCount = ViewModel.Current.BackupItems.Count;
+                    int itemsCount = CurrentBackupTask.Items.Length;
                     string balloonTipText = itemsCount + (itemsCount == 1 ? " Directory" : " Directories");
 
                     notifyIcon.ShowBalloonTip(5000, "Backup started.", balloonTipText, ToolTipIcon.Info);
@@ -202,16 +172,18 @@ namespace BackupApp
                     HideWindow(mainWindow);
                     ShowWindow(backupWindow);
                 }
-
-                backupStartedDateTime = DateTime.Now;
             }));
+
+            await CurrentBackupTask.Task;
+
+            await HideBackupWindow();
         }
 
-        public void HideBackupWindow()
+        private async Task HideBackupWindow()
         {
-            backupWindow.Dispatcher.BeginInvoke((Action)(() =>
+            await backupWindow.Dispatcher.BeginInvoke((Action)(() =>
             {
-                if (ViewModel.Current.IsHidden) ShowNotifyIcon();
+                if (viewModel.IsHidden) ShowNotifyIcon();
                 else
                 {
                     HideWindow(backupWindow);
@@ -222,19 +194,26 @@ namespace BackupApp
 
         private void ShowNotifyIcon()
         {
-            if (BackupManager.Current.Failed)
+            if (CurrentBackupTask.Failed)
             {
                 notifyIcon.ShowBalloonTip(5000, "Backup failed.", "", ToolTipIcon.Info);
             }
             else
             {
-                int itemsCount = ViewModel.Current.BackupItems.Count;
-                TimeSpan backupTimeSpan = DateTime.Now - backupStartedDateTime;
+                int itemsCount = CurrentBackupTask.Items.Length;
+                TimeSpan backupTimeSpan = DateTime.Now - CurrentBackupTask.Started;
                 string balloonTipText = itemsCount + (itemsCount == 1 ? " Directory\n" : " Directories\n") +
                     OffsetIntervalViewModel.ConvertTimeSpanToStringLong(backupTimeSpan);
 
                 notifyIcon.ShowBalloonTip(5000, "Backup finished.", balloonTipText, ToolTipIcon.Info);
             }
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private void OnPropertyChanged(string name)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
     }
 }

@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using FolderFile;
 
 namespace BackupApp
 {
@@ -14,13 +10,8 @@ namespace BackupApp
 
         public long ScheduledBackupTicks { get; set; }
 
-        public string BackupFolderPath { get; set; }
+        public SerializableFolder? BackupDestFolder { get; set; }
 
-        public List<BackupItem> Items { get; set; }
-
-        public Settings()
-        {
-
-        }
+        public BackupItem[] Items { get; set; }
     }
 }

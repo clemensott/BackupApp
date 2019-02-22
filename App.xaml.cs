@@ -1,11 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Configuration;
-using System.Data;
+﻿using Microsoft.Win32;
+using System;
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
+using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
+using System.Xml.Serialization;
 
 namespace BackupApp
 {
@@ -14,16 +18,14 @@ namespace BackupApp
     /// </summary>
     public partial class App : Application
     {
-        private void Application_Startup(object sender, StartupEventArgs e)
+        protected override void OnStartup(StartupEventArgs e)
         {
-            ViewModel viewModel = ViewModel.Current;
-
-            DispatcherUnhandledException += App_DispatcherUnhandledException;
+            base.OnStartup(e);
         }
 
         private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
         {
-            int threadID = System.Threading.Thread.CurrentThread.ManagedThreadId;
+            int threadID = Thread.CurrentThread.ManagedThreadId;
             DebugEvent.SaveText("DispatcherUnhandledException", "ThreadID: " + threadID, e.Exception.Message);
         }
     }

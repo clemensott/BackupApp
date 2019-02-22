@@ -5,8 +5,14 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:BackupApp"
         xmlns:ff="clr-namespace:FolderFile;assembly=FolderFileLib"
+        xmlns:con="clr-namespace:StdOttFramework.Converters;assembly=StdOttFrameworkLib"
         mc:Ignorable="d"
         Title="Backomat" Height="450" Width="825">
+
+    <Window.Resources>
+        <local:DateTimeConverter x:Key="dateTimeCon"/>
+    </Window.Resources>
+    
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -17,11 +23,16 @@
         </Grid.RowDefinitions>
 
         <TextBlock Grid.Row="0" Text="Path for Backups:" Margin="10,5,10,0"/>
-        <ff:FolderPicker Grid.Row="1" Folder="{Binding BackupFolder,
-            Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}" Margin="5"/>
+        <ff:FolderPicker Grid.Row="1" Margin="5" SubTypeSelection="Hidden" IsRefreshButtonVisable="false"
+                         Folder="{Binding BackupDestFolder,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}"/>
 
         <ListBox Grid.Row="2" SelectedIndex="{Binding BackupItemsIndex,Mode=TwoWay,
                  UpdateSourceTrigger=PropertyChanged}" ItemsSource="{Binding BackupItems}">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                </Style>
+            </ListBox.ItemContainerStyle>
             <ListBox.ItemTemplate>
                 <DataTemplate>
                     <Grid Margin="0,2">
@@ -30,8 +41,10 @@
                             <ColumnDefinition Width="*" MinWidth="500"/>
                         </Grid.ColumnDefinitions>
 
-                        <TextBox Text="{Binding Name,Mode=TwoWay,UpdateSourceTrigger=LostFocus}" Margin="5"/>
-                        <ff:FolderPicker Grid.Column="1" Folder="{Binding Folder,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}"/>
+                        <TextBox VerticalAlignment="Center" Margin="5"
+                                 Text="{Binding Name,Mode=TwoWay,UpdateSourceTrigger=LostFocus}"/>
+                        <ff:FolderPicker Grid.Column="1" VerticalAlignment="Center" IsRefreshButtonVisable="false"
+                                         Folder="{Binding Folder,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}"/>
                     </Grid>
                 </DataTemplate>
             </ListBox.ItemTemplate>
@@ -47,14 +60,14 @@
             </Grid.ColumnDefinitions>
 
             <Button Grid.Column="3" Grid.Row="0" Content="Add" HorizontalAlignment="Left" 
-                    Margin="5" Width="100" Click="btnAdd_Click"/>
+                    Margin="5" Width="100" Click="BtnAdd_Click"/>
             <Button Grid.Column="4" Grid.Row="0" Content="Remove" HorizontalAlignment="Left" 
-                    Margin="5" Width="100" Click="btnRemove_Click"/>
+                    Margin="5" Width="100" Click="BtnRemove_Click"/>
 
             <Button Grid.Column="0" Grid.Row="0" Content="Change times"
-                    Width="100" Margin="5" Click="btnChangeTimes_Click"/>
+                    Width="100" Margin="5" Click="BtnChangeTimes_Click"/>
             <Button Grid.Column="1" Grid.Row="0" Content="Backup now"
-                    Width="100" Margin="5" Click="btnBackupNow_Click"/>
+                    Width="100" Margin="5" Click="BtnBackupNow_Click"/>
         </Grid>
         
         <Grid Grid.Row="4" Background="LightGray" Margin="5">
@@ -67,9 +80,12 @@
             </Grid.ColumnDefinitions>
 
             <TextBlock Grid.Column="0" Margin="5,2" Text="Next Backup:"/>
-            <TextBlock Grid.Column="1" Margin="0,2" Text="{Binding NextBackupDateTimeWithIntervalText}"/>
+            <TextBlock Grid.Column="1" Margin="0,2" Text="{Binding NextScheduledBackup,
+                         Converter={StaticResource dateTimeCon}}"/>
+            
             <TextBlock Grid.Column="3" Margin="0,2" Text="Latest Backup:"/>
-            <TextBlock Grid.Column="4" Margin="5,2" Text="{Binding LatestBackupDateTimeText}"/>
+            <TextBlock Grid.Column="4" Margin="5,2" Text="{Binding LatestBackupDateTime,
+                         Converter={StaticResource dateTimeCon}}"/>
         </Grid>
     </Grid>
 </Window>

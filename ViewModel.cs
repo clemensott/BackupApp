@@ -1,39 +1,28 @@
 ﻿using FolderFile;
+using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using System.Windows;
-using System.Xml.Serialization;
+using System.Timers;
 
 namespace BackupApp
 {
-    class ViewModel : INotifyPropertyChanged
+    public class ViewModel : INotifyPropertyChanged
     {
-        private const string datafilename = "Data.txt";
-        private static ViewModel instance;
+        private const int keepBackupConstant = 10;
 
-        public static ViewModel Current
-        {
-            get
-            {
-                if (instance == null) instance = Load();
-
-                return instance;
-            }
-        }
-
-        public static bool IsLoaded { get { return instance != null; } }
-
-        private bool isHidden, isMoving;
-        private int itemIndex;
-        private DateTime nextScheduledBackup;
+        private bool isHidden;
+        private int backupItemsIndex;
+        private Timer timer;
         private OffsetIntervalViewModel backupTimes;
-        private Folder backupFolder;
-        private List<BackupItem> items;
+        private DateTime nextScheduledBackup;
+        private DateTime? latestBackupDateTime;
+        private Folder backupDestFolder;
+        private readonly WindowManager windowManager;
 
         public bool IsHidden
         {
@@ -43,68 +32,19 @@ namespace BackupApp
                 if (value == isHidden) return;
 
                 isHidden = value;
-
-                ViewModel.SaveData();
+                OnPropertyChanged(nameof(IsHidden));
             }
-        }
-
-        public bool IsMoving
-        {
-            get { return isMoving; }
-            set
-            {
-                if (value == isMoving) return;
-
-                isMoving = value;
-
-                OnPropertyChanged("IsMoving");
-                OnPropertyChanged("IsEnabled");
-                OnPropertyChanged("IsMovingTextVisibility");
-            }
-        }
-
-        public bool IsEnabled { get { return !isMoving; } }
-
-        public Visibility IsMovingTextVisibility
-        {
-            get { return IsMoving ? Visibility.Visible : Visibility.Hidden; }
         }
 
         public int BackupItemsIndex
         {
-            get { return itemIndex; }
+            get { return backupItemsIndex; }
             set
             {
-                if (value == itemIndex && itemIndex < items.Count) return;
+                if (value == backupItemsIndex) return;
 
-                itemIndex = value;
-
-                if (itemIndex >= items.Count) itemIndex = items.Count - 1;
-
-                OnPropertyChanged("BackupItemsIndex");
-            }
-        }
-
-        public string CloseCancelButtonText
-        {
-            get { return BackupManager.Current.IsBackuping ? "Cancel" : "Close"; }
-        }
-
-        public string NextBackupDateTimeWithIntervalText
-        {
-            get
-            {
-                return string.Format("{0} ({1})", BackupTimes.NextDateTime.GetDateTimeFormats()[14],
-                    BackupTimes.IntervalTextLong);
-            }
-        }
-
-        public string LatestBackupDateTimeText
-        {
-            get
-            {
-                return BackupManager.Current.LatestBackupDateTime.Ticks == 0 ? "None" :
-                    BackupManager.Current.LatestBackupDateTime.GetDateTimeFormats()[14];
+                backupItemsIndex = value;
+                OnPropertyChanged(nameof(BackupItemsIndex));
             }
         }
 
@@ -116,148 +56,252 @@ namespace BackupApp
                 if (value == backupTimes) return;
 
                 backupTimes = value;
+                OnPropertyChanged(nameof(BackupTimes));
 
-                SetNextScheduledBackup();
-                BackupManager.Current.SetTimer();
-
-                OnPropertyChanged("BackupTimes");
-                UpdateNextBackupDateTimeWithIntervalText();
-                SaveData();
+                NextScheduledBackup = BackupTimes.Next;
             }
         }
 
         public DateTime NextScheduledBackup
         {
-            get { return nextScheduledBackup.Ticks > 0 ? nextScheduledBackup : BackupTimes.NextDateTime; }
-        }
-
-        public Folder BackupFolder
-        {
-            get { return backupFolder; }
+            get { return nextScheduledBackup; }
             set
             {
-                if (value == backupFolder) return;
+                if (value == nextScheduledBackup) return;
 
-                backupFolder = value;
+                nextScheduledBackup = value;
+                OnPropertyChanged(nameof(NextScheduledBackup));
 
-                OnPropertyChanged("BackupFolder");
-                SaveData();
+                SetTimer();
             }
         }
 
-        public List<BackupItem> BackupItems
+        public DateTime? LatestBackupDateTime
         {
-            get { return items.ToList(); }
+            get { return latestBackupDateTime; }
             set
             {
-                if (value == items) return;
+                if (value == latestBackupDateTime) return;
 
-                items = value;
-
-                OnPropertyChanged("BackupItems");
+                latestBackupDateTime = value;
+                OnPropertyChanged(nameof(LatestBackupDateTime));
             }
         }
 
-        public ViewModel()
+        public Folder BackupDestFolder
         {
-            backupTimes = new OffsetIntervalViewModel();
-            backupFolder = new Folder("", SubfolderType.This);
-            items = new List<BackupItem>();
+            get { return backupDestFolder; }
+            set
+            {
+                if (value == backupDestFolder) return;
+
+                backupDestFolder = value;
+                OnPropertyChanged(nameof(BackupDestFolder));
+
+                UpdateLatestBackupDateTime();
+            }
         }
 
-        public ViewModel(Settings settings)
+        public ObservableCollection<BackupItem> BackupItems { get; private set; }
+
+        public ViewModel(MainWindow mainWindow, Settings settings)
         {
-            IsHidden = settings.IsHidden;
-            backupTimes = new OffsetIntervalViewModel(settings.BackupTimes);
+            windowManager = new WindowManager(mainWindow, this);
+
+            isHidden = settings.IsHidden;
+            backupTimes = (OffsetIntervalViewModel)settings.BackupTimes;
             nextScheduledBackup = new DateTime(settings.ScheduledBackupTicks);
-            System.Diagnostics.Debug.WriteLine(nextScheduledBackup);
-            backupFolder = new Folder(settings.BackupFolderPath, SubfolderType.This);
-            items = settings.Items;
-        }
-
-        private static ViewModel Load()
-        {
-            try
-            {
-                using (Stream stream = System.IO.File.OpenRead(datafilename))
-                {
-                    XmlSerializer serializer = new XmlSerializer(typeof(Settings));
-                    Settings settings = (Settings)serializer.Deserialize(stream);
-
-                    return new ViewModel(settings);
-                }
-            }
-            catch
-            {
-                return new ViewModel();
-            }
-        }
-
-        public static void SaveData()
-        {
-            if (!IsLoaded || !WindowManager.Current.IsLoaded) return;
+            BackupItems = new ObservableCollection<BackupItem>(settings.Items);
 
             try
             {
-                using (Stream stream = new FileStream(datafilename, FileMode.Create))
-                {
-                    XmlSerializer serializer = new XmlSerializer(typeof(Settings));
-                    Settings settings = new Settings();
-
-                    settings.IsHidden = Current.IsHidden;
-                    settings.BackupTimes = new OffsetInterval(Current.BackupTimes);
-                    settings.ScheduledBackupTicks = Current.nextScheduledBackup.Ticks;
-                    settings.BackupFolderPath = Current.BackupFolder.FullPath;
-                    settings.Items = Current.BackupItems;
-
-                    serializer.Serialize(stream, settings);
-                }
+                backupDestFolder = settings.BackupDestFolder;
             }
             catch { }
+
+            UpdateLatestBackupDateTime();
+
+            SystemEvents.PowerModeChanged += OnPowerChange;
+
+            CheckForBackup();
         }
 
-        public void SetNextScheduledBackup()
+        private async void OnPowerChange(object s, PowerModeChangedEventArgs e)
         {
-            nextScheduledBackup = BackupTimes.NextDateTime;
+            int threadID = System.Threading.Thread.CurrentThread.ManagedThreadId;
+            DebugEvent.SaveText("OnPowerChange", "ThreadID: " + threadID, e.Mode);
 
-            SaveData();
+            if (e.Mode == PowerModes.Resume)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(10));
+
+                CheckForBackup();
+            }
         }
 
-        public void AddBackupItem()
+        public void SetTimer()
         {
-            items.Add(new BackupItem());
+            int threadID = System.Threading.Thread.CurrentThread.ManagedThreadId;
+            DebugEvent.SaveText("SetTimer", "ThreadID: " + threadID);
 
-            UpdateBackupItems();
+            Close();
+
+            timer = new Timer
+            {
+                AutoReset = false,
+                Enabled = true,
+                Interval = (NextScheduledBackup - DateTime.Now).TotalMilliseconds
+            };
+
+            timer.Elapsed += Timer_Elapsed;
+            timer.Start();
         }
 
-        public void RemoveSelectedBackupItem()
+        public void Close()
         {
-            if (BackupItemsIndex == -1) return;
-
-            int itemIndexBackup = BackupItemsIndex;
-
-            items.RemoveAt(BackupItemsIndex);
-
-            UpdateBackupItems();
-
-            BackupItemsIndex = itemIndexBackup;
+            timer?.Dispose();
         }
 
-        public void UpdateBackupItems()
+        private void Timer_Elapsed(object sender, ElapsedEventArgs e)
         {
-            OnPropertyChanged("BackupItems");
+            int threadID = System.Threading.Thread.CurrentThread.ManagedThreadId;
+            DebugEvent.SaveText("TimerElapsed", "ThreadID: " + threadID);
 
-            SaveData();
+            NextScheduledBackup = BackupTimes.Next;
+
+            BackupAsync();
         }
 
-        public void UpdateNextBackupDateTimeWithIntervalText()
+        private IEnumerable<DateTime> GetBackupsDateTimes()
         {
-            OnPropertyChanged("NextBackupDateTimeWithIntervalText");
+            FileInfo[] backups = BackupDestFolder?.Refresh() ?? new FileInfo[0];
+
+            foreach (FileInfo backup in backups)
+            {
+                DateTime dateTimeOfBackup;
+                string name = backup.Name.Remove(backup.Name.Length - 4);
+
+                if (TryConvertToDateTime(name, out dateTimeOfBackup)) yield return dateTimeOfBackup;
+            }
         }
+
+        private bool TryConvertToDateTime(string name, out DateTime dateTime)
+        {
+            dateTime = new DateTime();
+            string[] dateTimeParts = name.Split(';');
+
+            if (dateTimeParts.Length < 2) return false;
+
+            string[] dateParts = dateTimeParts[0].Split('-');
+            string[] timeParts = dateTimeParts[1].Split('-');
+            int year, month, day, hour, minute, second;
+
+            if (dateParts.Length < 3 || !int.TryParse(dateParts[0], out year) ||
+                !int.TryParse(dateParts[1], out month) || !int.TryParse(dateParts[2], out day) ||
+                timeParts.Length < 3 || !int.TryParse(timeParts[0], out hour) ||
+                !int.TryParse(timeParts[1], out minute) || !int.TryParse(timeParts[2], out second)) return false;
+
+            dateTime = new DateTime(year, month, day, hour, minute, second);
+
+            return true;
+        }
+
+        public BackupTask BackupAsync()
+        {
+            BackupTask task = windowManager.CurrentBackupTask = BackupTask.Run(BackupDestFolder, BackupItems);
+
+            DeleteOldBackupsAfterTask(task);
+
+            return task;
+        }
+
+        private async void DeleteOldBackupsAfterTask(BackupTask task)
+        {
+            await task.Task;
+
+            if (windowManager.CurrentBackupTask == task && !task.Failed && !task.CancelToken.IsCanceled)
+            {
+                DeleteOldBackups();
+                UpdateNextScheduledBackup();
+                UpdateLatestBackupDateTime();
+            }
+        }
+
+        private void DeleteOldBackups()
+        {
+            DateTime[] backupsDateTimes = GetBackupsDateTimes().ToArray();
+
+            if (backupsDateTimes.Length == 0) return;
+
+            DateTime now = DateTime.Now;
+            long intervalTimes = (now - backupsDateTimes[0]).Ticks / BackupTimes.Interval.Ticks;
+
+            if (intervalTimes <= 0) intervalTimes = 1;
+
+            int levels = (int)Math.Log(intervalTimes, keepBackupConstant);
+            int factor = (int)Math.Pow(keepBackupConstant, levels);
+
+            DateTime preDateTime = backupsDateTimes[0];
+            List<DateTime> leftDateTimes = backupsDateTimes.ToList();
+
+            leftDateTimes.Remove(leftDateTimes.Last());
+
+            for (int i = 0; i <= levels; i++)
+            {
+                TimeSpan curInterval = new TimeSpan(factor * BackupTimes.Interval.Ticks);
+                DateTime untilDateTime = now.Subtract(curInterval);
+
+                while (preDateTime <= untilDateTime)
+                {
+                    var nearestDateTime = backupsDateTimes.OrderBy(d => Math.Abs((d - preDateTime).Ticks)).First();
+
+                    if ((nearestDateTime - preDateTime).Ticks < curInterval.Ticks / 2.0)
+                    {
+                        leftDateTimes.Remove(nearestDateTime);
+                    }
+
+                    preDateTime = preDateTime.Add(curInterval);
+                }
+
+                if (i + 1 == levels) preDateTime = now.Subtract(curInterval);
+
+                factor /= keepBackupConstant;
+            }
+
+            foreach (DateTime deleteDateTime in leftDateTimes) DeleteBackup(deleteDateTime);
+        }
+
+        private void DeleteBackup(DateTime dateTimeOfBackup)
+        {
+            string backupPath = Path.Combine(BackupDestFolder.FullName, BackupTask.ConvertDateTimeOfBackupToString(dateTimeOfBackup) + ".zip");
+
+            try
+            {
+                File.Delete(backupPath);
+            }
+            catch (Exception e)
+            {
+                int threadID = System.Threading.Thread.CurrentThread.ManagedThreadId;
+                DebugEvent.SaveText("DeleteBackupExeption", "ThreadID: " + threadID, e.Message.Replace('\n', ' '));
+            }
+        }
+
+        public void CheckForBackup()
+        {
+            int threadID = System.Threading.Thread.CurrentThread.ManagedThreadId;
+            DebugEvent.SaveText("CheckForBackup", "ThreadID: " + threadID, "NextBackup: " + NextScheduledBackup);
+
+            if (NextScheduledBackup <= DateTime.Now) BackupAsync();
+            else SetTimer();
+        }
+
+        public void UpdateNextScheduledBackup() => NextScheduledBackup = BackupTimes.Next;
 
         public void UpdateLatestBackupDateTime()
         {
-            OnPropertyChanged("LatestBackupDateTimeText");
+            DateTime[] times = GetBackupsDateTimes().ToArray();
+
+            LatestBackupDateTime = times.Length > 0 ? (DateTime?)times.Last() : null;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

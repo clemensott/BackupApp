@@ -1,9 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Xml.Serialization;
 
 namespace BackupApp
@@ -27,6 +22,7 @@ namespace BackupApp
         [XmlIgnore]
         public TimeSpan Offset { get; set; }
 
+        [XmlIgnore]
         public TimeSpan Interval
         {
             get { return interval; }
@@ -37,6 +33,7 @@ namespace BackupApp
                 interval = value;
             }
         }
+
         public OffsetInterval() : this(TimeSpan.Zero, TimeSpan.FromDays(1))
         {
 

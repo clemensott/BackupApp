@@ -4,36 +4,52 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:BackupApp"
+        xmlns:con="clr-namespace:StdOttFramework.Converters;assembly=StdOttFrameworkLib"
+        xmlns:spi="clr-namespace:StdOttFramework.Converters.Specialized;assembly=StdOttFrameworkLib"
         mc:Ignorable="d"
         Title="Backup" Height="300" Width="300">
+
+    <Window.Resources>
+        <con:InvertConverter x:Key="invCon"/>
+        <spi:VisableHiddenConverter x:Key="visCon"/>
+        <local:ProgressTextConverter x:Key="progressCon"/>
+    </Window.Resources>
+    
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <ListBox ItemsSource="{Binding BackupItems}" IsEnabled="{Binding IsEnabled}" Margin="5">
+        <ListBox Margin="5" ItemsSource="{Binding Items}"
+                 IsEnabled="{Binding IsMoving,Converter={StaticResource invCon}}">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                </Style>
+            </ListBox.ItemContainerStyle>
             <ListBox.ItemTemplate>
                 <DataTemplate>
                     <Grid>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" MinWidth="160"/>
+                            <ColumnDefinition Width="*" MinWidth="160"/>
                             <ColumnDefinition Width="100"/>
                         </Grid.ColumnDefinitions>
 
                         <TextBlock Grid.Column="0" Text="{Binding Name}" Margin="0,0,10,0"/>
                         <ProgressBar Grid.Column="1" Minimum="0" Maximum="1" 
                                      Value="{Binding Progress,Mode=OneWay}"/>
-                        <TextBlock Grid.Column="1" Text="{Binding ProgressText}" TextAlignment="Center"/>
+                        <TextBlock Grid.Column="1" TextAlignment="Center"
+                                   Text="{Binding Progress,Converter={StaticResource progressCon}}"/>
                     </Grid>
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
 
         <TextBlock Text="Is moving backup" TextAlignment="Center" VerticalAlignment="Center"
-                   HorizontalAlignment="Center" Visibility="{Binding IsMovingTextVisibility}"/>
+                   HorizontalAlignment="Center" Visibility="{Binding IsMoving,Converter={StaticResource visCon}}"/>
 
-        <Button Grid.Row="1" Content="Cancel" Width="100" IsEnabled="{Binding IsEnabled}"
-                Margin="5,0,5,5" HorizontalAlignment="Right" Click="btnCloseCancel_Click"/>
+        <Button Grid.Row="1" Content="Cancel" Width="100" IsEnabled="{Binding IsMoving,Converter={StaticResource invCon}}"
+                Margin="5,0,5,5" HorizontalAlignment="Right" Click="BtnCloseCancel_Click"/>
     </Grid>
 </Window>
