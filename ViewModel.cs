@@ -15,7 +15,7 @@ namespace BackupApp
     {
         private const int keepBackupConstant = 10;
 
-        private bool isHidden;
+        private bool isHidden, isBackupEnabled;
         private int backupItemsIndex;
         private Timer timer;
         private OffsetIntervalViewModel backupTimes;
@@ -45,6 +45,20 @@ namespace BackupApp
 
                 backupItemsIndex = value;
                 OnPropertyChanged(nameof(BackupItemsIndex));
+            }
+        }
+
+        public bool IsBackupEnabled
+        {
+            get { return isBackupEnabled; }
+            set
+            {
+                if (value == isBackupEnabled) return;
+
+                isBackupEnabled = value;
+                OnPropertyChanged(nameof(IsBackupEnabled));
+
+                SetTimer();
             }
         }
 
@@ -104,20 +118,17 @@ namespace BackupApp
 
         public ObservableCollection<BackupItem> BackupItems { get; private set; }
 
-        public ViewModel(MainWindow mainWindow, Settings settings)
+        public ViewModel(MainWindow mainWindow, bool isHidden, bool isEnabled, OffsetIntervalViewModel backupTimes,
+            DateTime nextScheduledBackup, Folder backupDestFolder, IEnumerable<BackupItem> backupItems)
         {
+            this.isHidden = isHidden;
+            this.isBackupEnabled = isEnabled;
+            this.backupTimes = backupTimes;
+            this.nextScheduledBackup = nextScheduledBackup;
+            this.backupDestFolder = backupDestFolder;
+            BackupItems = new ObservableCollection<BackupItem>(backupItems);
+
             windowManager = new WindowManager(mainWindow, this);
-
-            isHidden = settings.IsHidden;
-            backupTimes = (OffsetIntervalViewModel)settings.BackupTimes;
-            nextScheduledBackup = new DateTime(settings.ScheduledBackupTicks);
-            BackupItems = new ObservableCollection<BackupItem>(settings.Items);
-
-            try
-            {
-                backupDestFolder = settings.BackupDestFolder;
-            }
-            catch { }
 
             UpdateLatestBackupDateTime();
 
@@ -169,7 +180,7 @@ namespace BackupApp
 
             NextScheduledBackup = BackupTimes.Next;
 
-            BackupAsync();
+            if (IsBackupEnabled) BackupAsync();
         }
 
         private IEnumerable<DateTime> GetBackupsDateTimes()

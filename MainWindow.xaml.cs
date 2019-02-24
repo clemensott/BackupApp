@@ -1,11 +1,14 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Xml.Serialization;
+using FolderFile;
 
 namespace BackupApp
 {
@@ -25,25 +28,45 @@ namespace BackupApp
         {
             InitializeComponent();
 
-            Settings settings;
-            try
-            {
-                settings = LoadSettings(dataFilename);
-            }
-            catch
-            {
-                settings = new Settings()
-                {
-                    BackupTimes = new OffsetInterval(TimeSpan.Zero, TimeSpan.FromDays(1)),
-                    ScheduledBackupTicks = 0,
-                    BackupDestFolder = null,
-                    Items = new BackupItem[0]
-                };
-            }
+            SetViewModel();
+        }
 
-            DataContext = viewModel = new ViewModel(this, settings);
+        private async void SetViewModel()
+        {
+            DataContext = viewModel = await LoadViewModel();
 
             Subscribe(viewModel);
+        }
+
+        private async Task<ViewModel> LoadViewModel()
+        {
+            bool isHidden = false;
+            bool isEnabled = false;
+            OffsetIntervalViewModel backupTimes = new OffsetIntervalViewModel(TimeSpan.Zero, TimeSpan.FromDays(1));
+            DateTime nextScheduledBackup = backupTimes.Next;
+            Folder backupDestFolder = null;
+            IEnumerable<BackupItem> backupItems = new BackupItem[0];
+
+            try
+            {
+                Settings settings = LoadSettings(dataFilename);
+
+                if (settings.IsHidden) Hide();
+
+                await Task.Run(() =>
+                {
+                    isHidden = settings.IsHidden;
+                    isEnabled = settings.IsEnabled;
+                    backupTimes = (OffsetIntervalViewModel)settings.BackupTimes;
+                    nextScheduledBackup = new DateTime(settings.ScheduledBackupTicks);
+                    backupDestFolder = settings.BackupDestFolder;
+                    backupItems = settings.Items;
+                });
+            }
+            catch { }
+
+            return new ViewModel(this, isHidden, isEnabled, backupTimes, nextScheduledBackup, backupDestFolder, backupItems);
+
         }
 
         private static Settings LoadSettings(string path)
@@ -61,6 +84,7 @@ namespace BackupApp
             viewModel.PropertyChanged += ViewModel_PropertyChanged;
 
             Subscribe(viewModel.BackupTimes);
+            Subscribe(viewModel.BackupDestFolder);
             Subscribe(viewModel.BackupItems);
         }
 
@@ -71,6 +95,7 @@ namespace BackupApp
             viewModel.PropertyChanged -= ViewModel_PropertyChanged;
 
             Unsubscribe(viewModel.BackupTimes);
+            Unsubscribe(viewModel.BackupDestFolder);
             Unsubscribe(viewModel.BackupItems);
         }
 
@@ -82,6 +107,16 @@ namespace BackupApp
         private void Unsubscribe(OffsetIntervalViewModel oivm)
         {
             if (oivm != null) oivm.PropertyChanged -= Oivm_PropertyChanged;
+        }
+
+        private void Subscribe(Folder folder)
+        {
+            if (folder != null) folder.PropertyChanged += Folder_PropertyChanged;
+        }
+
+        private void Unsubscribe(Folder folder)
+        {
+            if (folder != null) folder.PropertyChanged -= Folder_PropertyChanged;
         }
 
         private void Subscribe(ObservableCollection<BackupItem> backupItems)
@@ -99,13 +134,38 @@ namespace BackupApp
 
             backupItems.CollectionChanged -= BackupItems_CollectionChanged;
 
-            foreach (BackupItem item in backupItems) item.PropertyChanged -= BackupItem_PropertyChanged;
+            foreach (BackupItem item in backupItems) Unsubscribe(item);
+        }
+
+        private void Subscribe(BackupItem item)
+        {
+            if (item == null) return;
+
+            item.PropertyChanged += BackupItem_PropertyChanged;
+            Subscribe(item.Folder);
+        }
+
+        private void Unsubscribe(BackupItem item)
+        {
+            if (item == null) return;
+
+            item.PropertyChanged -= BackupItem_PropertyChanged;
+            Unsubscribe(item.Folder);
         }
 
         private void ViewModel_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(ViewModel.BackupDestFolder) || e.PropertyName == nameof(ViewModel.NextScheduledBackup)) Save();
-            else if (e.PropertyName == nameof(ViewModel.BackupTimes))
+            if (e.PropertyName == nameof(viewModel.IsHidden) || e.PropertyName == nameof(viewModel.IsBackupEnabled) ||
+                e.PropertyName == nameof(viewModel.NextScheduledBackup))
+            {
+                Save();
+            }
+            else if (e.PropertyName == nameof(viewModel.BackupDestFolder))
+            {
+                Subscribe(viewModel.BackupDestFolder);
+                Save();
+            }
+            else if (e.PropertyName == nameof(viewModel.BackupTimes))
             {
                 Subscribe(viewModel.BackupTimes);
                 Save();
@@ -120,19 +180,39 @@ namespace BackupApp
             else if (e.PropertyName == nameof(oivm.Interval) || e.PropertyName == nameof(oivm.Offset)) Save();
         }
 
+        private void Folder_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            Folder folder = (Folder)sender;
+
+            if (folder == viewModel.BackupDestFolder || viewModel.BackupItems.Any(i => i.Folder == folder)) Save();
+            else folder.PropertyChanged -= Folder_PropertyChanged;
+        }
+
         private void BackupItems_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
             foreach (BackupItem item in e.NewItems?.Cast<BackupItem>() ?? Enumerable.Empty<BackupItem>())
             {
-                item.PropertyChanged += BackupItem_PropertyChanged;
+                Subscribe(item);
             }
 
             foreach (BackupItem item in e.OldItems?.Cast<BackupItem>() ?? Enumerable.Empty<BackupItem>())
             {
-                item.PropertyChanged -= BackupItem_PropertyChanged;
+                Subscribe(item);
             }
 
             Save();
+        }
+
+        private void BackupItem_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            BackupItem item = (BackupItem)sender;
+
+            if (e.PropertyName == nameof(item.Name)) Save();
+            else if (e.PropertyName == nameof(item.Folder))
+            {
+                Subscribe(item.Folder);
+                Save();
+            }
         }
 
         private void Save()
@@ -142,6 +222,7 @@ namespace BackupApp
             Settings settings = new Settings()
             {
                 IsHidden = viewModel.IsHidden,
+                IsEnabled = viewModel.IsBackupEnabled,
                 BackupTimes = (OffsetInterval)viewModel.BackupTimes,
                 ScheduledBackupTicks = viewModel.NextScheduledBackup.Ticks,
                 BackupDestFolder = viewModel.BackupDestFolder,
@@ -166,13 +247,6 @@ namespace BackupApp
             catch { }
         }
 
-        private void BackupItem_PropertyChanged(object sender, PropertyChangedEventArgs e)
-        {
-            BackupItem item = (BackupItem)sender;
-
-            if (e.PropertyName == nameof(item.Name) || e.PropertyName == nameof(item.Folder)) Save();
-        }
-
         private void BtnAdd_Click(object sender, RoutedEventArgs e)
         {
             viewModel?.BackupItems.Add(new BackupItem());
@@ -189,12 +263,17 @@ namespace BackupApp
 
         private void BtnChangeTimes_Click(object sender, RoutedEventArgs e)
         {
+            if (viewModel == null) return;
+
+            bool wasEnabled = viewModel.IsBackupEnabled;
             BackupTimesWindow window = new BackupTimesWindow(viewModel.BackupTimes);
 
-            if (window.ShowDialog() == true)
-            {
-                viewModel.BackupTimes = window.BackupTimes;
-            }
+            viewModel.IsBackupEnabled = false;
+
+            if (window.ShowDialog() == true) viewModel.BackupTimes = window.BackupTimes;
+            else viewModel.UpdateNextScheduledBackup();
+
+            viewModel.IsBackupEnabled = wasEnabled;
         }
 
         private void BtnBackupNow_Click(object sender, RoutedEventArgs e)

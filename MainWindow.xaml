@@ -11,9 +11,10 @@
 
     <Window.Resources>
         <local:DateTimeConverter x:Key="dateTimeCon"/>
+        <con:IsNullConverter x:Key="loadingCon" EqualsValue="false" NotEqualsValue="true"/>
     </Window.Resources>
     
-    <Grid>
+    <Grid IsEnabled="{Binding Converter={StaticResource loadingCon}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -79,7 +80,7 @@
                 <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
-            <TextBlock Grid.Column="0" Margin="5,2" Text="Next Backup:"/>
+            <CheckBox Grid.Column="0" Margin="5,2" Content="Next Backup:" IsChecked="{Binding IsBackupEnabled,Mode=TwoWay}"/>
             <TextBlock Grid.Column="1" Margin="0,2" Text="{Binding NextScheduledBackup,
                          Converter={StaticResource dateTimeCon}}"/>
             

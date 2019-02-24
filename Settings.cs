@@ -6,6 +6,8 @@ namespace BackupApp
     {
         public bool IsHidden { get; set; }
 
+        public bool IsEnabled { get; set; }
+
         public OffsetInterval BackupTimes { get; set; }
 
         public long ScheduledBackupTicks { get; set; }

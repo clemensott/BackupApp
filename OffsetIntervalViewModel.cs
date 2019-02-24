@@ -8,8 +8,6 @@ namespace BackupApp
     {
         string nextBackupTimeText, intervalText;
 
-        private OffsetInterval @base;
-
         public OffsetInterval Base { get; set; }
 
         public long OffsetTicks
@@ -132,6 +130,10 @@ namespace BackupApp
         public string IntervalTextLong { get { return ConvertTimeSpanToStringLong(Interval); } }
 
         public OffsetIntervalViewModel() : this(new OffsetInterval())
+        {
+        }
+
+        public OffsetIntervalViewModel(TimeSpan offset, TimeSpan interval) : this(new OffsetInterval(offset, interval))
         {
         }
 

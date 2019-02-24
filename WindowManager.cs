@@ -25,9 +25,8 @@ namespace BackupApp
             set
             {
                 backupWindow.CurrentBackupTask = value;
-
-                if (viewModel.IsHidden) HideWindows();
-                else ShowBackupWindow();
+                
+                ShowBackupWindowOrToolTip();
             }
         }
 
@@ -133,7 +132,6 @@ namespace BackupApp
 
         private void MainWindow_Activated(object sender, EventArgs e)
         {
-            System.Diagnostics.Debug.WriteLine(viewModel.IsHidden);
             if (viewModel.IsHidden) HideWindows();
         }
 
@@ -156,7 +154,7 @@ namespace BackupApp
             if (backupWindow.WindowState == WindowState.Minimized) HideWindows();
         }
 
-        public async Task ShowBackupWindow()
+        public async Task ShowBackupWindowOrToolTip()
         {
             await backupWindow.Dispatcher.BeginInvoke((Action)(() =>
             {
@@ -173,7 +171,7 @@ namespace BackupApp
                     ShowWindow(backupWindow);
                 }
             }));
-
+            
             await CurrentBackupTask.Task;
 
             await HideBackupWindow();
