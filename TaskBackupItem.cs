@@ -43,12 +43,12 @@ namespace BackupApp
 
             OnPropertyChanged(nameof(Progress));
 
-            return Task.Run(new Action(LoadFilesCount));
+            return LoadFilesCount();
         }
 
-        private void LoadFilesCount()
+        private async Task LoadFilesCount()
         {
-            Folder.Refresh();
+            await Folder.RefreshAsync();
 
             filesCount = Folder.Files.Length;
         }
@@ -57,11 +57,11 @@ namespace BackupApp
         {
             if (!Directory.Exists(Folder.FullName)) return false;
 
-            bool hasEnties = false;
+            bool hasEntries = false;
 
             try
             {
-                int removeLength = Folder.Directory.FullName.TrimEnd('\\').Length;
+                int removeLength = Folder.FullName.TrimEnd('\\').Length;
 
                 foreach (FileInfo file in Folder.Files)
                 {
@@ -75,7 +75,7 @@ namespace BackupApp
 
                             archive.CreateEntryFromFile(file.FullName, name, CompressionLevel.Optimal);
 
-                            hasEnties = true;
+                            hasEntries = true;
                         }
                         catch { }
                     }
@@ -88,43 +88,11 @@ namespace BackupApp
             catch (Exception e)
             {
                 int threadID = System.Threading.Thread.CurrentThread.ManagedThreadId;
-                DebugEvent.SaveText("BackupItemBackupException", "ThreadID: " + threadID, e.Message.Replace('\n', ' '));
+                DebugEvent.SaveText("BackupItemBackupException", "ThreadID: " + threadID,
+                    e.Message.Replace('\n', ' '));
             }
 
-            return hasEnties;
-        }
-
-        private string GetRelativePath(FileInfo file, DirectoryInfo dir)
-        {
-            return file.FullName.Substring(dir.FullName.Length);
-        }
-
-        private void AddEntries(ZipArchive archive, string directoryPath, DirectoryInfo directory, BackupCancelToken cancelToken)
-        {
-            if (IsHidden(directory)) return;
-
-            foreach (FileInfo file in Folder.Files)
-            {
-                if (cancelToken.IsCanceled) return;
-
-                if (!IsHidden(file))
-                {
-                    try
-                    {
-                        string name = directoryPath + "/" + file.Name;
-
-                        archive.CreateEntryFromFile(file.FullName, name, CompressionLevel.Optimal);
-                    }
-                    catch { }
-                }
-
-                IncreaseCompressCount();
-            }
-
-            //foreach (DirectoryInfo subDir in directory.GetDirectories())
-            //{
-            //    AddEntries(archive, directoryPath + "/" + subDir.Name, subDir, cancelToken);
-            //}
+            return hasEntries;
         }
 
         private bool IsHidden(FileSystemInfo info)

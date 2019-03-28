@@ -24,7 +24,8 @@
         </Grid.RowDefinitions>
 
         <TextBlock Grid.Row="0" Text="Path for Backups:" Margin="10,5,10,0"/>
-        <ff:FolderPicker Grid.Row="1" Margin="5" SubTypeSelection="Hidden" IsRefreshButtonVisable="false"
+        <ff:FolderPicker Grid.Row="1" Margin="5" SubTypeSelection="Hidden"
+                         IsRefreshButtonVisible="false" AutoRefreshSelection="ForceFalse"
                          Folder="{Binding BackupDestFolder,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}"/>
 
         <ListBox Grid.Row="2" SelectedIndex="{Binding BackupItemsIndex,Mode=TwoWay,
@@ -44,7 +45,8 @@
 
                         <TextBox VerticalAlignment="Center" Margin="5"
                                  Text="{Binding Name,Mode=TwoWay,UpdateSourceTrigger=LostFocus}"/>
-                        <ff:FolderPicker Grid.Column="1" VerticalAlignment="Center" IsRefreshButtonVisable="false"
+                        <ff:FolderPicker Grid.Column="1" VerticalAlignment="Center" IsRefreshButtonVisible="false"
+                                         AutoRefreshSelection="ForceFalse"
                                          Folder="{Binding Folder,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}"/>
                     </Grid>
                 </DataTemplate>

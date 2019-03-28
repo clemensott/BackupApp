@@ -17,8 +17,6 @@ namespace BackupApp
     /// </summary>
     public partial class MainWindow : Window
     {
-        // \\fritz.box\FRITZ.NAS\ASMT-2115-01\Cache\Backup
-
         private const string dataFilename = "Data.xml";
         private static readonly XmlSerializer serializer = new XmlSerializer(typeof(Settings));
 
@@ -59,14 +57,13 @@ namespace BackupApp
                     isEnabled = settings.IsEnabled;
                     backupTimes = (OffsetIntervalViewModel)settings.BackupTimes;
                     nextScheduledBackup = new DateTime(settings.ScheduledBackupTicks);
-                    backupDestFolder = settings.BackupDestFolder;
+                    backupDestFolder = Folder.CreateOrDefault(settings.BackupDestFolder);
                     backupItems = settings.Items;
                 });
             }
             catch { }
 
             return new ViewModel(this, isHidden, isEnabled, backupTimes, nextScheduledBackup, backupDestFolder, backupItems);
-
         }
 
         private static Settings LoadSettings(string path)
@@ -184,7 +181,10 @@ namespace BackupApp
         {
             Folder folder = (Folder)sender;
 
-            if (folder == viewModel.BackupDestFolder || viewModel.BackupItems.Any(i => i.Folder == folder)) Save();
+            if (folder == viewModel.BackupDestFolder || viewModel.BackupItems.Any(i => i.Folder == folder))
+            {
+                if (e.PropertyName == nameof(folder.SubType)) Save();
+            }
             else folder.PropertyChanged -= Folder_PropertyChanged;
         }
 
@@ -225,7 +225,7 @@ namespace BackupApp
                 IsEnabled = viewModel.IsBackupEnabled,
                 BackupTimes = (OffsetInterval)viewModel.BackupTimes,
                 ScheduledBackupTicks = viewModel.NextScheduledBackup.Ticks,
-                BackupDestFolder = viewModel.BackupDestFolder,
+                BackupDestFolder = (SerializableFolder?)viewModel.BackupDestFolder,
                 Items = viewModel.BackupItems.ToArray()
             };
 

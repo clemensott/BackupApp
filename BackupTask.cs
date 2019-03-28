@@ -5,6 +5,7 @@ using System.ComponentModel;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
 namespace BackupApp
@@ -103,13 +104,11 @@ namespace BackupApp
 
         private Task BackupAsync()
         {
-            Task = Task.Run(new Action(Backup));
             Started = DateTime.Now;
-
-            return Task;
+            return Task = Backup();
         }
 
-        private void Backup()
+        private async Task Backup()
         {
             int threadID = System.Threading.Thread.CurrentThread.ManagedThreadId;
             DebugEvent.SaveText("Backup", "ThreadID: " + threadID);
@@ -120,7 +119,7 @@ namespace BackupApp
 
             string backupZipPath = Path.Combine(DestFolder.FullName, ConvertDateTimeOfBackupToString(DateTime.Now) + ".zip");
 
-            HandleBackup(backupZipPath);
+            await HandleBackup(backupZipPath);
 
             IsBackuping = false;
         }
@@ -133,7 +132,7 @@ namespace BackupApp
                 dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, dt.Second);
         }
 
-        private void HandleBackup(string zipFilePath)
+        private async Task HandleBackup(string zipFilePath)
         {
             int threadID = System.Threading.Thread.CurrentThread.ManagedThreadId;
             DebugEvent.SaveText("HandleBackup", "ThreadID: " + threadID);
@@ -142,7 +141,7 @@ namespace BackupApp
 
             if (!CompressDirect(out tmpZipFilePath))
             {
-                if (!CreateBackup(tmpZipFilePath)) return;
+                if (!await CreateBackup(tmpZipFilePath)) return;
 
                 try
                 {
@@ -150,16 +149,17 @@ namespace BackupApp
                     else
                     {
                         IsMoving = true;
-                        File.Move(tmpZipFilePath, zipFilePath);
+                        await Task.Run(() => File.Move(tmpZipFilePath, zipFilePath));
                         IsMoving = false;
 
-                        DebugEvent.SaveText("HandleBackupSucessfull", "ThreadID: " + threadID);
+                        DebugEvent.SaveText("HandleBackupSuccessful", "ThreadID: " + threadID);
                         Failed = false;
                     }
                 }
                 catch (Exception e)
                 {
-                    DebugEvent.SaveText("HandleBackupException", "ThreadID: " + threadID, e.Message.Replace('\n', ' '));
+                    DebugEvent.SaveText("HandleBackupException", "ThreadID: " + threadID,
+                        e.Message.Replace("\r\n", " "));
 
                     try
                     {
@@ -170,10 +170,10 @@ namespace BackupApp
                     catch { }
                 }
             }
-            else CreateBackup(zipFilePath);
+            else await CreateBackup(zipFilePath);
         }
 
-        private bool CreateBackup(string zipFilePath)
+        private async Task<bool> CreateBackup(string zipFilePath)
         {
             int threadID = System.Threading.Thread.CurrentThread.ManagedThreadId;
             DebugEvent.SaveText("CreateBackup", "ThreadID: " + threadID, "Path: " + zipFilePath);
@@ -184,28 +184,36 @@ namespace BackupApp
             }
             catch (Exception e)
             {
-                DebugEvent.SaveText("CreateBackupDelete1Exeption", "ThreadID: " + threadID, e.Message.Replace('\n', ' '));
+                DebugEvent.SaveText("CreateBackupDelete1Exception", "ThreadID: " + threadID,
+                    e.Message.Replace("\r\n", " "));
             }
 
             bool hasEntries = false;
 
             try
             {
-                Task.WaitAll(Items.Select(i => i.BeginBackup()).ToArray());
+                Dictionary<Task, TaskBackupItem> dict = Items.ToDictionary(i => i.BeginBackup());
 
-                using (ZipArchive archive = ZipFile.Open(zipFilePath, ZipArchiveMode.Create))
+                await Task.Run(async () =>
                 {
-                    foreach (TaskBackupItem item in Items)
+                    using (ZipArchive archive = ZipFile.Open(zipFilePath, ZipArchiveMode.Create))
                     {
-                        if (CancelToken.IsCanceled) break;
+                        while (!CancelToken.IsCanceled && dict.Count > 0)
+                        {
+                            Task filesLoadedTask = await Task.WhenAny(dict.Keys);
 
-                        if (item.Backup(archive, CancelToken)) hasEntries = true;
+                            if (CancelToken.IsCanceled) break;
+                            if (dict[filesLoadedTask].Backup(archive, CancelToken)) hasEntries = true;
+
+                            dict.Remove(filesLoadedTask);
+                        }
                     }
-                }
+                });
             }
             catch (Exception e)
             {
-                DebugEvent.SaveText("CreateBackupItselfException", "ThreadID: " + threadID, e.Message.Replace('\n', ' '));
+                DebugEvent.SaveText("CreateBackupItselfException", "ThreadID: " + threadID,
+                    e.Message.Replace("\r\n", " "));
             }
 
             if (!hasEntries || CancelToken.IsCanceled) File.Delete(zipFilePath);

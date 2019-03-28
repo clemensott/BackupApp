@@ -27,8 +27,8 @@ namespace BackupApp
 
         public SerializableFolder? SerialFolder
         {
-            get { return folder; }
-            set { if (value != SerialFolder) Folder = value; }
+            get { return (SerializableFolder?)folder; }
+            set { Folder = Folder.CreateOrDefault(value); }
         }
 
         [XmlIgnore]
@@ -43,7 +43,7 @@ namespace BackupApp
 
                 OnPropertyChanged("Folder");
 
-                if (Name == "" && Folder != null) Name = Folder.Directory.Name;
+                if (Name == "" && Folder != null) Name = Folder.Name;
             }
         }
 
@@ -62,9 +62,7 @@ namespace BackupApp
 
         protected void OnPropertyChanged(string name)
         {
-            if (PropertyChanged == null) return;
-
-            PropertyChanged(this, new PropertyChangedEventArgs(name));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
 
         public override string ToString()

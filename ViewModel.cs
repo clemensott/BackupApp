@@ -319,9 +319,7 @@ namespace BackupApp
 
         protected void OnPropertyChanged(string name)
         {
-            if (PropertyChanged == null) return;
-
-            PropertyChanged(this, new PropertyChangedEventArgs(name));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
     }
 }

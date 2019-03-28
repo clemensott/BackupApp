@@ -11,7 +11,7 @@
 
     <Window.Resources>
         <con:InvertConverter x:Key="invCon"/>
-        <spi:VisableHiddenConverter x:Key="visCon"/>
+        <spi:VisibleHiddenConverter x:Key="visCon"/>
         <local:ProgressTextConverter x:Key="progressCon"/>
     </Window.Resources>
     
