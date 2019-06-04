@@ -2,8 +2,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace BackupApp
 {
@@ -11,7 +9,7 @@ namespace BackupApp
     {
         private const char partSplitter = ';', eventSplitter = '|', addChar = '&';
         private const string debugEventsFileName = "debug.txt";
-        private const int maxLengthOfOneData = 50;
+        private const int maxLengthOfOneData = 300;
 
         private static readonly object lockObj = new object();
 
@@ -33,7 +31,7 @@ namespace BackupApp
         {
             Name = name;
 
-            Data = data.Select(x => ToString(x)).ToArray();
+            Data = data.Select(ToString).ToArray();
         }
 
         public DebugEvent(string dataString) : this()
