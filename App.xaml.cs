@@ -17,7 +17,8 @@ namespace BackupApp
         private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
         {
             int threadID = Thread.CurrentThread.ManagedThreadId;
-            DebugEvent.SaveText("DispatcherUnhandledException", "ThreadID: " + threadID, e.Exception.ToString());
+            DebugEvent.SaveText("DispatcherUnhandledException", "ThreadID: " + threadID,
+                e.Exception.ToString(), e.Exception.StackTrace);
         }
     }
 }
