@@ -157,15 +157,19 @@ namespace BackupApp
 
             Close();
 
-            timer = new Timer
+            if (NextScheduledBackup > DateTime.Now)
             {
-                AutoReset = false,
-                Enabled = true,
-                Interval = (NextScheduledBackup - DateTime.Now).TotalMilliseconds
-            };
+                timer = new Timer
+                {
+                    AutoReset = false,
+                    Enabled = true,
+                    Interval = (NextScheduledBackup - DateTime.Now).TotalMilliseconds
+                };
 
-            timer.Elapsed += Timer_Elapsed;
-            timer.Start();
+                timer.Elapsed += Timer_Elapsed;
+                timer.Start();
+            }
+            else RunBackup();
         }
 
         public void Close()
@@ -175,8 +179,13 @@ namespace BackupApp
 
         private void Timer_Elapsed(object sender, ElapsedEventArgs e)
         {
+            RunBackup();
+        }
+
+        private void RunBackup()
+        {
             int threadID = System.Threading.Thread.CurrentThread.ManagedThreadId;
-            DebugEvent.SaveText("TimerElapsed", "ThreadID: " + threadID);
+            DebugEvent.SaveText("RunBackup", "ThreadID: " + threadID);
 
             NextScheduledBackup = BackupTimes.Next;
 
@@ -234,8 +243,9 @@ namespace BackupApp
             {
                 DeleteOldBackups();
                 UpdateNextScheduledBackup();
-                UpdateLatestBackupDateTime();
             }
+
+            UpdateLatestBackupDateTime();
         }
 
         private void DeleteOldBackups()
@@ -284,7 +294,8 @@ namespace BackupApp
 
         private void DeleteBackup(DateTime dateTimeOfBackup)
         {
-            string backupPath = Path.Combine(BackupDestFolder.FullName, BackupTask.ConvertDateTimeOfBackupToString(dateTimeOfBackup) + ".zip");
+            string backupPath = Path.Combine(BackupDestFolder.FullName,
+                BackupTask.ConvertDateTimeOfBackupToString(dateTimeOfBackup) + ".zip");
 
             try
             {
@@ -293,7 +304,8 @@ namespace BackupApp
             catch (Exception e)
             {
                 int threadID = System.Threading.Thread.CurrentThread.ManagedThreadId;
-                DebugEvent.SaveText("DeleteBackupExeption", "ThreadID: " + threadID, e.Message.Replace('\n', ' '));
+                DebugEvent.SaveText("DeleteBackupException",
+                    "ThreadID: " + threadID, e.Message.Replace('\n', ' '));
             }
         }
 
