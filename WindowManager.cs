@@ -25,7 +25,7 @@ namespace BackupApp
             set
             {
                 backupWindow.CurrentBackupTask = value;
-                
+
                 ShowBackupWindowOrToolTip();
             }
         }
@@ -76,8 +76,16 @@ namespace BackupApp
 
         private void NotifyIcon_MouseMove(object sender, System.Windows.Forms.MouseEventArgs e)
         {
-            if (CurrentBackupTask != null && CurrentBackupTask.IsBackuping) notifyIcon.Text = "Is Backuping";
-            else notifyIcon.Text = string.Format("Next Backup in: {0}", viewModel.BackupTimes.TimeToNextBackupText);
+            try
+            {
+                notifyIcon.Text = CurrentBackupTask?.IsBackuping == true
+                    ? "Is Backuping"
+                    : string.Format("Next Backup in: {0}", viewModel.BackupTimes.TimeToNextBackupText);
+            }
+            catch (Exception exc)
+            {
+                DebugEvent.SaveText("NotifyIcon_MouseMove", exc);
+            }
         }
 
         private void NotifyIcon_DoubleClick(object sender, EventArgs e)
@@ -144,9 +152,9 @@ namespace BackupApp
         {
             viewModel.Close();
 
-            if (components != null) components.Dispose();
-            if (notifyIcon != null) notifyIcon.Dispose();
-            if (backupWindow != null) backupWindow.Close();
+            components?.Dispose();
+            notifyIcon?.Dispose();
+            backupWindow?.Close();
         }
 
         private void BackupWindow_StateChanged(object sender, EventArgs e)
@@ -171,7 +179,7 @@ namespace BackupApp
                     ShowWindow(backupWindow);
                 }
             }));
-            
+
             await CurrentBackupTask.Task;
 
             await HideBackupWindow();
