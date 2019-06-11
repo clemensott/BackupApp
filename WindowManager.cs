@@ -202,7 +202,8 @@ namespace BackupApp
         {
             if (CurrentBackupTask.Failed)
             {
-                notifyIcon.ShowBalloonTip(5000, "Backup failed.", "", ToolTipIcon.Info);
+                notifyIcon.ShowBalloonTip(5000, "Backup failed.", 
+                    CurrentBackupTask.FailedException.Message, ToolTipIcon.Error);
             }
             else
             {

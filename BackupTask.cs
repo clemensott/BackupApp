@@ -13,6 +13,7 @@ namespace BackupApp
     public class BackupTask : INotifyPropertyChanged
     {
         private bool isMoving, failed, isBackuping;
+        private Exception failedException;
         private Task task;
         private DateTime started;
 
@@ -43,12 +44,24 @@ namespace BackupApp
         public bool Failed
         {
             get { return failed; }
-            set
+            private set
             {
                 if (value == failed) return;
 
                 failed = value;
                 OnPropertyChanged(nameof(Failed));
+            }
+        }
+
+        public Exception FailedException
+        {
+            get { return failedException; }
+            private set
+            {
+                if (value == failedException) return;
+
+                failedException = value;
+                OnPropertyChanged(nameof(FailedException));
             }
         }
 
@@ -164,6 +177,7 @@ namespace BackupApp
                     try
                     {
                         Failed = true;
+                        FailedException = e;
 
                         File.Delete(tmpZipFilePath);
                     }
