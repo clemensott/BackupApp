@@ -36,7 +36,7 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>323.ico</ApplicationIcon>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -130,12 +130,6 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="776.ico" />
-  </ItemGroup>
-  <ItemGroup>
-    <Resource Include="323.ico" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\OrdnerDatei\FolderFileLib.csproj">
       <Project>{0de5f7b2-633a-4acf-b6ad-df37bd9e68d9}</Project>
       <Name>FolderFileLib</Name>
@@ -144,6 +138,9 @@
       <Project>{d1334524-78a5-4d16-93bf-27a57c6dbe56}</Project>
       <Name>StdOttFrameworkLib</Name>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="icon.ico" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
