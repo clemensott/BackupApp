@@ -6,9 +6,11 @@ using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Timers;
 using System.Windows;
 using System.Xml.Serialization;
 using FolderFile;
+using Microsoft.Win32;
 
 namespace BackupApp
 {
@@ -21,6 +23,7 @@ namespace BackupApp
         private static readonly XmlSerializer serializer = new XmlSerializer(typeof(Settings));
 
         private ViewModel viewModel;
+        private Timer timer;
 
         public MainWindow()
         {
@@ -34,12 +37,18 @@ namespace BackupApp
             DataContext = viewModel = await LoadViewModel();
 
             Subscribe(viewModel);
+
+            WindowManager.CreateInstance(this, viewModel);
+
+            SystemEvents.PowerModeChanged += OnPowerChange;
+            CheckForBackup();
         }
 
         private async Task<ViewModel> LoadViewModel()
         {
             bool isHidden = false;
             bool isEnabled = false;
+            bool? compressDirect = true;
             OffsetIntervalViewModel backupTimes = new OffsetIntervalViewModel(TimeSpan.Zero, TimeSpan.FromDays(1));
             DateTime nextScheduledBackup = backupTimes.Next;
             Folder backupDestFolder = null;
@@ -55,6 +64,7 @@ namespace BackupApp
                 {
                     isHidden = settings.IsHidden;
                     isEnabled = settings.IsEnabled;
+                    compressDirect = settings.CompressDirect;
                     backupTimes = (OffsetIntervalViewModel)settings.BackupTimes;
                     nextScheduledBackup = new DateTime(settings.ScheduledBackupTicks);
                     backupDestFolder = Folder.CreateOrDefault(settings.BackupDestFolder);
@@ -63,7 +73,8 @@ namespace BackupApp
             }
             catch { }
 
-            return new ViewModel(this, isHidden, isEnabled, backupTimes, nextScheduledBackup, backupDestFolder, backupItems);
+            return new ViewModel(isHidden, isEnabled, compressDirect,
+                backupTimes, nextScheduledBackup, backupDestFolder, backupItems);
         }
 
         private static Settings LoadSettings(string path)
@@ -122,7 +133,7 @@ namespace BackupApp
 
             backupItems.CollectionChanged += BackupItems_CollectionChanged;
 
-            foreach (BackupItem item in backupItems) item.PropertyChanged += BackupItem_PropertyChanged;
+            foreach (BackupItem item in backupItems) Subscribe(item);
         }
 
         private void Unsubscribe(ObservableCollection<BackupItem> backupItems)
@@ -152,21 +163,28 @@ namespace BackupApp
 
         private void ViewModel_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName == nameof(viewModel.IsHidden) || e.PropertyName == nameof(viewModel.IsBackupEnabled) ||
-                e.PropertyName == nameof(viewModel.NextScheduledBackup))
+            switch (e.PropertyName)
             {
-                Save();
+                case nameof(viewModel.IsHidden):
+                case nameof(viewModel.IsBackupEnabled):
+                case nameof(viewModel.CompressDirect):
+                case nameof(viewModel.NextScheduledBackup):
+                    Save();
+                    break;
+
+                case nameof(viewModel.BackupDestFolder):
+                    Subscribe(viewModel.BackupDestFolder);
+                    Save();
+                    break;
+
+                case nameof(viewModel.BackupTimes):
+                    Subscribe(viewModel.BackupTimes);
+                    Save();
+                    break;
             }
-            else if (e.PropertyName == nameof(viewModel.BackupDestFolder))
-            {
-                Subscribe(viewModel.BackupDestFolder);
-                Save();
-            }
-            else if (e.PropertyName == nameof(viewModel.BackupTimes))
-            {
-                Subscribe(viewModel.BackupTimes);
-                Save();
-            }
+
+            if (e.PropertyName == nameof(viewModel.IsBackupEnabled) ||
+                e.PropertyName == nameof(viewModel.NextScheduledBackup)) CheckForBackup();
         }
 
         private void Oivm_PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -223,6 +241,7 @@ namespace BackupApp
             {
                 IsHidden = viewModel.IsHidden,
                 IsEnabled = viewModel.IsBackupEnabled,
+                CompressDirect = viewModel.CompressDirect,
                 BackupTimes = (OffsetInterval)viewModel.BackupTimes,
                 ScheduledBackupTicks = viewModel.NextScheduledBackup.Ticks,
                 BackupDestFolder = (SerializableFolder?)viewModel.BackupDestFolder,
@@ -247,38 +266,81 @@ namespace BackupApp
             catch { }
         }
 
-        private void BtnAdd_Click(object sender, RoutedEventArgs e)
+        private async void OnPowerChange(object sender, PowerModeChangedEventArgs e)
         {
-            viewModel?.BackupItems.Add(new BackupItem());
+            DebugEvent.SaveText("OnPowerChange");
+
+            if (e.Mode != PowerModes.Resume) return;
+
+            await Task.Delay(TimeSpan.FromSeconds(10));
+
+            CheckForBackup();
         }
 
-        private void BtnRemove_Click(object sender, RoutedEventArgs e)
+        private void CheckForBackup()
         {
-            int index = viewModel?.BackupItemsIndex ?? -1;
+            DebugEvent.SaveText("CheckForBackup", "NextBackup: " + viewModel.NextScheduledBackup);
 
-            if (index < 0 || index >= viewModel.BackupItems.Count) return;
-
-            viewModel.BackupItems.RemoveAt(index);
+            if (viewModel.NextScheduledBackup <= DateTime.Now)
+            {
+                if (viewModel.IsBackupEnabled) BackupAsync();
+                else viewModel.NextScheduledBackup = viewModel.BackupTimes.Next;
+            }
+            else SetTimer();
         }
 
-        private void BtnChangeTimes_Click(object sender, RoutedEventArgs e)
+        private BackupTask BackupAsync()
         {
-            if (viewModel == null) return;
+            BackupTask task = BackupTask.Run(viewModel.BackupDestFolder,
+                viewModel.BackupItems, viewModel.CompressDirect);
 
-            bool wasEnabled = viewModel.IsBackupEnabled;
-            BackupTimesWindow window = new BackupTimesWindow(viewModel.BackupTimes);
+            WindowManager.Current.SetBackupTask(task);
 
-            viewModel.IsBackupEnabled = false;
+            UpdateBackupBrowser(task);
 
-            if (window.ShowDialog() == true) viewModel.BackupTimes = window.BackupTimes;
-            else viewModel.UpdateNextScheduledBackup();
+            return task;
+        }
 
-            viewModel.IsBackupEnabled = wasEnabled;
+        private async void UpdateBackupBrowser(BackupTask task)
+        {
+            await task.Task;
+            await bbcBackups.UpdateBackups();
+        }
+
+        private void SetTimer()
+        {
+            DebugEvent.SaveText("SetTimer");
+
+            timer?.Dispose();
+
+            double interval = Math.Max((viewModel.NextScheduledBackup - DateTime.Now).TotalMilliseconds, 0);
+
+            timer = new Timer
+            {
+                AutoReset = false,
+                Enabled = true,
+                Interval = interval
+            };
+
+            timer.Elapsed += Timer_Elapsed;
+            timer.Start();
+        }
+
+        private void Timer_Elapsed(object sender, ElapsedEventArgs e)
+        {
+            CheckForBackup();
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            timer?.Dispose();
+
+            base.OnClosed(e);
         }
 
         private void BtnBackupNow_Click(object sender, RoutedEventArgs e)
         {
-            viewModel?.BackupAsync();
+            BackupAsync();
         }
     }
 }

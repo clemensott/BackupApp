@@ -9,22 +9,25 @@ namespace BackupApp
     {
         private const char partSplitter = ';', eventSplitter = '|', addChar = '&';
         private const string debugEventsFileName = "debug.txt";
-        private const int maxLengthOfOneData = 300;
+        private const int maxLengthOfOneData = 1000;
 
         private static readonly object lockObj = new object();
 
-        public bool IsChecked { get; set; }
+        public bool IsChecked { get; }
 
-        public long Time { get; set; }
+        public long Time { get; }
 
-        public string Name { get; set; }
+        public int ThreadId { get; }
 
-        public string[] Data { get; set; }
+        public string Name { get; }
+
+        public string[] Data { get; }
 
         private DebugEvent()
         {
             IsChecked = true;
             Time = DateTime.Now.Ticks;
+            ThreadId = System.Threading.Thread.CurrentThread.ManagedThreadId;
         }
 
         private DebugEvent(string name, object[] data) : this()
@@ -118,6 +121,7 @@ namespace BackupApp
 
             AddToDataString(ref dataString, Time);
             AddToDataString(ref dataString, Name);
+            AddToDataString(ref dataString, "ThreadId: " + ThreadId);
 
             foreach (string data in Data)
             {

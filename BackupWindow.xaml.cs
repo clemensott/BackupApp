@@ -1,56 +1,42 @@
-﻿using System;
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Windows;
 
 namespace BackupApp
 {
-    /// <summary>
-    /// Interaktionslogik für BackupWindow.xaml
-    /// </summary>
     public partial class BackupWindow : Window
     {
-        private BackupTask currentBackupTask;
+        private BackupTask task;
 
-        public BackupTask CurrentBackupTask
+        public BackupTask Task
         {
-            get { return currentBackupTask; }
+            get => task;
             set
             {
-                currentBackupTask = value;
+                task = value;
 
-                Dispatcher.Invoke(() => DataContext = currentBackupTask);
+                Dispatcher.Invoke(() => DataContext = task);
             }
         }
 
         public BackupWindow()
         {
             InitializeComponent();
-
-            StateChanged += BackupWindow_StateChanged;
         }
 
-        private void BackupWindow_StateChanged(object sender, EventArgs e)
+        private void BtnCloseCancel_Click(object sender, RoutedEventArgs e)
         {
-            ShowInTaskbar = WindowState != WindowState.Minimized;
-
-            if (ShowInTaskbar) Focus();
+            Close();
         }
 
         protected override void OnClosing(CancelEventArgs e)
         {
             base.OnClosing(e);
 
-            if (CurrentBackupTask != null)
-            {
-                e.Cancel = CurrentBackupTask.IsBackuping;
+            if (Task == null) return;
 
-                if (!CurrentBackupTask.IsMoving) CurrentBackupTask.CancelToken.Cancel();
-            }
-        }
+            e.Cancel = Task?.IsBackuping == true;
 
-        private void BtnCloseCancel_Click(object sender, RoutedEventArgs e)
-        {
-            Close();
+            if (!Task.IsMoving) Task.CancelToken.Cancel();
         }
     }
 }

@@ -1,13 +1,10 @@
 ﻿using FolderFile;
-using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
-using System.Timers;
 
 namespace BackupApp
 {
@@ -16,13 +13,12 @@ namespace BackupApp
         private const int keepBackupConstant = 10;
 
         private bool isHidden, isBackupEnabled;
+        private bool? compressDirect;
         private int backupItemsIndex;
-        private Timer timer;
         private OffsetIntervalViewModel backupTimes;
         private DateTime nextScheduledBackup;
         private DateTime? latestBackupDateTime;
         private Folder backupDestFolder;
-        private readonly WindowManager windowManager;
 
         public bool IsHidden
         {
@@ -57,8 +53,18 @@ namespace BackupApp
 
                 isBackupEnabled = value;
                 OnPropertyChanged(nameof(IsBackupEnabled));
+            }
+        }
 
-                SetTimer();
+        public bool? CompressDirect
+        {
+            get => compressDirect;
+            set
+            {
+                if (value == compressDirect) return;
+
+                compressDirect = value;
+                OnPropertyChanged(nameof(CompressDirect));
             }
         }
 
@@ -85,8 +91,6 @@ namespace BackupApp
 
                 nextScheduledBackup = value;
                 OnPropertyChanged(nameof(NextScheduledBackup));
-
-                SetTimer();
             }
         }
 
@@ -116,80 +120,20 @@ namespace BackupApp
             }
         }
 
-        public ObservableCollection<BackupItem> BackupItems { get; private set; }
+        public ObservableCollection<BackupItem> BackupItems { get; }
 
-        public ViewModel(MainWindow mainWindow, bool isHidden, bool isEnabled, OffsetIntervalViewModel backupTimes,
+        public ViewModel(bool isHidden, bool isEnabled, bool? compressDirect, OffsetIntervalViewModel backupTimes,
             DateTime nextScheduledBackup, Folder backupDestFolder, IEnumerable<BackupItem> backupItems)
         {
             this.isHidden = isHidden;
             this.isBackupEnabled = isEnabled;
+            this.compressDirect = compressDirect;
             this.backupTimes = backupTimes;
             this.nextScheduledBackup = nextScheduledBackup;
             this.backupDestFolder = backupDestFolder;
             BackupItems = new ObservableCollection<BackupItem>(backupItems);
 
-            windowManager = new WindowManager(mainWindow, this);
-
             UpdateLatestBackupDateTime();
-
-            SystemEvents.PowerModeChanged += OnPowerChange;
-
-            CheckForBackup();
-        }
-
-        private async void OnPowerChange(object s, PowerModeChangedEventArgs e)
-        {
-            int threadID = System.Threading.Thread.CurrentThread.ManagedThreadId;
-            DebugEvent.SaveText("OnPowerChange", "ThreadID: " + threadID, e.Mode);
-
-            if (e.Mode == PowerModes.Resume)
-            {
-                await Task.Delay(TimeSpan.FromSeconds(10));
-
-                CheckForBackup();
-            }
-        }
-
-        public void SetTimer()
-        {
-            int threadID = System.Threading.Thread.CurrentThread.ManagedThreadId;
-            DebugEvent.SaveText("SetTimer", "ThreadID: " + threadID);
-
-            Close();
-
-            if (NextScheduledBackup > DateTime.Now)
-            {
-                timer = new Timer
-                {
-                    AutoReset = false,
-                    Enabled = true,
-                    Interval = (NextScheduledBackup - DateTime.Now).TotalMilliseconds
-                };
-
-                timer.Elapsed += Timer_Elapsed;
-                timer.Start();
-            }
-            else RunBackup();
-        }
-
-        public void Close()
-        {
-            timer?.Dispose();
-        }
-
-        private void Timer_Elapsed(object sender, ElapsedEventArgs e)
-        {
-            RunBackup();
-        }
-
-        private void RunBackup()
-        {
-            int threadID = System.Threading.Thread.CurrentThread.ManagedThreadId;
-            DebugEvent.SaveText("RunBackup", "ThreadID: " + threadID);
-
-            NextScheduledBackup = BackupTimes.Next;
-
-            if (IsBackupEnabled) BackupAsync();
         }
 
         private IEnumerable<DateTime> GetBackupsDateTimes()
@@ -205,7 +149,7 @@ namespace BackupApp
             }
         }
 
-        private bool TryConvertToDateTime(string name, out DateTime dateTime)
+        private static bool TryConvertToDateTime(string name, out DateTime dateTime)
         {
             dateTime = new DateTime();
             string[] dateTimeParts = name.Split(';');
@@ -224,98 +168,6 @@ namespace BackupApp
             dateTime = new DateTime(year, month, day, hour, minute, second);
 
             return true;
-        }
-
-        public BackupTask BackupAsync()
-        {
-            BackupTask task = windowManager.CurrentBackupTask = BackupTask.Run(BackupDestFolder, BackupItems);
-
-            DeleteOldBackupsAfterTask(task);
-
-            return task;
-        }
-
-        private async void DeleteOldBackupsAfterTask(BackupTask task)
-        {
-            await task.Task;
-
-            if (windowManager.CurrentBackupTask == task && !task.Failed && !task.CancelToken.IsCanceled)
-            {
-                DeleteOldBackups();
-                UpdateNextScheduledBackup();
-            }
-
-            UpdateLatestBackupDateTime();
-        }
-
-        private void DeleteOldBackups()
-        {
-            DateTime[] backupsDateTimes = GetBackupsDateTimes().ToArray();
-
-            if (backupsDateTimes.Length == 0) return;
-
-            DateTime now = DateTime.Now;
-            long intervalTimes = (now - backupsDateTimes[0]).Ticks / BackupTimes.Interval.Ticks;
-
-            if (intervalTimes <= 0) intervalTimes = 1;
-
-            int levels = (int)Math.Log(intervalTimes, keepBackupConstant);
-            int factor = (int)Math.Pow(keepBackupConstant, levels);
-
-            DateTime preDateTime = backupsDateTimes[0];
-            List<DateTime> leftDateTimes = backupsDateTimes.ToList();
-
-            leftDateTimes.Remove(leftDateTimes.Last());
-
-            for (int i = 0; i <= levels; i++)
-            {
-                TimeSpan curInterval = new TimeSpan(factor * BackupTimes.Interval.Ticks);
-                DateTime untilDateTime = now.Subtract(curInterval);
-
-                while (preDateTime <= untilDateTime)
-                {
-                    var nearestDateTime = backupsDateTimes.OrderBy(d => Math.Abs((d - preDateTime).Ticks)).First();
-
-                    if ((nearestDateTime - preDateTime).Ticks < curInterval.Ticks / 2.0)
-                    {
-                        leftDateTimes.Remove(nearestDateTime);
-                    }
-
-                    preDateTime = preDateTime.Add(curInterval);
-                }
-
-                if (i + 1 == levels) preDateTime = now.Subtract(curInterval);
-
-                factor /= keepBackupConstant;
-            }
-
-            foreach (DateTime deleteDateTime in leftDateTimes) DeleteBackup(deleteDateTime);
-        }
-
-        private void DeleteBackup(DateTime dateTimeOfBackup)
-        {
-            string backupPath = Path.Combine(BackupDestFolder.FullName,
-                BackupTask.ConvertDateTimeOfBackupToString(dateTimeOfBackup) + ".zip");
-
-            try
-            {
-                File.Delete(backupPath);
-            }
-            catch (Exception e)
-            {
-                int threadID = System.Threading.Thread.CurrentThread.ManagedThreadId;
-                DebugEvent.SaveText("DeleteBackupException",
-                    "ThreadID: " + threadID, e.Message.Replace('\n', ' '));
-            }
-        }
-
-        public void CheckForBackup()
-        {
-            int threadID = System.Threading.Thread.CurrentThread.ManagedThreadId;
-            DebugEvent.SaveText("CheckForBackup", "ThreadID: " + threadID, "NextBackup: " + NextScheduledBackup);
-
-            if (NextScheduledBackup <= DateTime.Now) BackupAsync();
-            else SetTimer();
         }
 
         public void UpdateNextScheduledBackup() => NextScheduledBackup = BackupTimes.Next;

@@ -8,6 +8,8 @@ namespace BackupApp
 
         public bool IsEnabled { get; set; }
 
+        public bool? CompressDirect { get; set; }
+
         public OffsetInterval BackupTimes { get; set; }
 
         public long ScheduledBackupTicks { get; set; }

@@ -10,11 +10,11 @@
         Title="Backup" Height="300" Width="300">
 
     <Window.Resources>
+        <local:ProgressTextConverter x:Key="progressCon"/>
         <con:InvertConverter x:Key="invCon"/>
         <spi:VisibleHiddenConverter x:Key="visCon"/>
-        <local:ProgressTextConverter x:Key="progressCon"/>
     </Window.Resources>
-    
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="*"/>
@@ -37,19 +37,30 @@
                         </Grid.ColumnDefinitions>
 
                         <TextBlock Grid.Column="0" Text="{Binding Name}" Margin="0,0,10,0"/>
-                        <ProgressBar Grid.Column="1" Minimum="0" Maximum="1" 
-                                     Value="{Binding Progress,Mode=OneWay}"/>
-                        <TextBlock Grid.Column="1" TextAlignment="Center"
-                                   Text="{Binding Progress,Converter={StaticResource progressCon}}"/>
+
+                        <Grid Grid.Column="1">
+                            <ProgressBar Maximum="1" Value="{Binding Progress,Mode=OneWay}"/>
+                            <TextBlock HorizontalAlignment="Center" Text="{Binding Progress,Mode=OneWay,
+                                         Converter={StaticResource progressCon}}"/>
+                        </Grid>
                     </Grid>
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
 
-        <TextBlock Text="Is moving backup" TextAlignment="Center" VerticalAlignment="Center"
-                   HorizontalAlignment="Center" Visibility="{Binding IsMoving,Converter={StaticResource visCon}}"/>
+        <Button Grid.Row="1" Content="Cancel" Width="100" Margin="5,0,5,5" HorizontalAlignment="Right"
+                IsEnabled="{Binding CancelToken.IsCanceled,Converter={StaticResource invCon}}"
+                Click="BtnCloseCancel_Click"/>
 
-        <Button Grid.Row="1" Content="Cancel" Width="100" IsEnabled="{Binding IsMoving,Converter={StaticResource invCon}}"
-                Margin="5,0,5,5" HorizontalAlignment="Right" Click="BtnCloseCancel_Click"/>
+        <StackPanel Grid.Row="0" VerticalAlignment="Center"
+                    Visibility="{Binding IsMoving,Converter={StaticResource visCon}}">
+            <TextBlock Text="Is moving backup" TextAlignment="Center" 
+                       VerticalAlignment="Center" HorizontalAlignment="Center"/>
+            <Grid>
+                <ProgressBar Maximum="1" Margin="5" Value="{Binding MoveProgress,Mode=OneWay}"/>
+                <TextBlock HorizontalAlignment="Center" Margin="5"
+                           Text="{Binding MoveProgress,Mode=OneWay,Converter={StaticResource progressCon}}"/>
+            </Grid>
+        </StackPanel>
     </Grid>
 </Window>

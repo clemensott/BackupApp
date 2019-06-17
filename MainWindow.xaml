@@ -10,17 +10,14 @@
         Title="Backomat" Height="450" Width="825">
 
     <Window.Resources>
-        <local:DateTimeConverter x:Key="dateTimeCon"/>
-        <con:IsNullConverter x:Key="loadingCon" EqualsValue="false" NotEqualsValue="true"/>
+        <con:IsNotNullConverter x:Key="loadingCon"/>
     </Window.Resources>
-    
+
     <Grid IsEnabled="{Binding Converter={StaticResource loadingCon}}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <TextBlock Grid.Row="0" Text="Path for Backups:" Margin="10,5,10,0"/>
@@ -28,67 +25,17 @@
                          IsRefreshButtonVisible="false" AutoRefreshSelection="ForceFalse"
                          Folder="{Binding BackupDestFolder,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}"/>
 
-        <ListBox Grid.Row="2" SelectedIndex="{Binding BackupItemsIndex,Mode=TwoWay,
-                 UpdateSourceTrigger=PropertyChanged}" ItemsSource="{Binding BackupItems}">
-            <ListBox.ItemContainerStyle>
-                <Style TargetType="ListBoxItem">
-                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-                </Style>
-            </ListBox.ItemContainerStyle>
-            <ListBox.ItemTemplate>
-                <DataTemplate>
-                    <Grid Margin="0,2">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" MinWidth="200"/>
-                            <ColumnDefinition Width="*" MinWidth="500"/>
-                        </Grid.ColumnDefinitions>
+        <Button Grid.Row="0" Content="Backup Now" HorizontalAlignment="Right"
+                Width="100" Margin="5,0" Click="BtnBackupNow_Click"/>
 
-                        <TextBox VerticalAlignment="Center" Margin="5"
-                                 Text="{Binding Name,Mode=TwoWay,UpdateSourceTrigger=LostFocus}"/>
-                        <ff:FolderPicker Grid.Column="1" VerticalAlignment="Center" IsRefreshButtonVisible="false"
-                                         AutoRefreshSelection="ForceFalse"
-                                         Folder="{Binding Folder,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}"/>
-                    </Grid>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
-
-        <Grid Grid.Row="3">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-
-            <Button Grid.Column="3" Grid.Row="0" Content="Add" HorizontalAlignment="Left" 
-                    Margin="5" Width="100" Click="BtnAdd_Click"/>
-            <Button Grid.Column="4" Grid.Row="0" Content="Remove" HorizontalAlignment="Left" 
-                    Margin="5" Width="100" Click="BtnRemove_Click"/>
-
-            <Button Grid.Column="0" Grid.Row="0" Content="Change times"
-                    Width="100" Margin="5" Click="BtnChangeTimes_Click"/>
-            <Button Grid.Column="1" Grid.Row="0" Content="Backup now"
-                    Width="100" Margin="5" Click="BtnBackupNow_Click"/>
-        </Grid>
-        
-        <Grid Grid.Row="4" Background="LightGray" Margin="5">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-
-            <CheckBox Grid.Column="0" Margin="5,2" Content="Next Backup:" IsChecked="{Binding IsBackupEnabled,Mode=TwoWay}"/>
-            <TextBlock Grid.Column="1" Margin="0,2" Text="{Binding NextScheduledBackup,
-                         Converter={StaticResource dateTimeCon}}"/>
-            
-            <TextBlock Grid.Column="3" Margin="0,2" Text="Latest Backup:"/>
-            <TextBlock Grid.Column="4" Margin="5,2" Text="{Binding LatestBackupDateTime,
-                         Converter={StaticResource dateTimeCon}}"/>
-        </Grid>
+        <TabControl Grid.Row="2">
+            <TabItem Header="Config">
+                <local:ConfigBackupControl />
+            </TabItem>
+            <TabItem Header="Read">
+                <local:BrowseBackupsControl x:Name="bbcBackups"
+                                            SrcFolder="{Binding BackupDestFolder.FullName}"/>
+            </TabItem>
+        </TabControl>
     </Grid>
 </Window>

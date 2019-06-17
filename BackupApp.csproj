@@ -63,22 +63,39 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
-    <Compile Include="BackupCancelToken.cs" />
-    <Compile Include="BackupItem.cs" />
-    <Compile Include="BackupTask.cs" />
+    <Compile Include="CancelToken.cs" />
+    <Compile Include="Backup\BackupItem.cs" />
+    <Compile Include="Backup\BackupTask.cs" />
     <Compile Include="BackupWindow.xaml.cs">
       <DependentUpon>BackupWindow.xaml</DependentUpon>
     </Compile>
-    <Compile Include="DateTimeConverter.cs" />
+    <Compile Include="Backup\Backup.cs" />
+    <Compile Include="Backup\BackupFile.cs" />
+    <Compile Include="Backup\BackupFolder.cs" />
+    <Compile Include="Backup\Backups.cs" />
+    <Compile Include="Backup\IBackupNode.cs" />
+    <Compile Include="BrowseBackupsControl.xaml.cs">
+      <DependentUpon>BrowseBackupsControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="ConfigBackupControl.xaml.cs">
+      <DependentUpon>ConfigBackupControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Converter\DateTimeConverter.cs" />
     <Compile Include="DebugEvent.cs" />
+    <Compile Include="Converter\FolderFileIconConverter.cs" />
+    <Compile Include="FolderAsync.cs" />
     <Compile Include="OffsetInterval.cs" />
     <Compile Include="BackupTimesWindow.xaml.cs">
       <DependentUpon>BackupTimesWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="OffsetIntervalViewModel.cs" />
-    <Compile Include="ProgressTextConverter.cs" />
+    <Compile Include="Converter\ProgressTextConverter.cs" />
+    <Compile Include="RestoreBackupWindow.xaml.cs">
+      <DependentUpon>RestoreBackupWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="RestoreTask.cs" />
     <Compile Include="Settings.cs" />
-    <Compile Include="TaskBackupItem.cs" />
+    <Compile Include="Backup\TaskBackupItem.cs" />
     <Compile Include="ViewModel.cs" />
     <Compile Include="WindowManager.cs" />
     <Page Include="BackupTimesWindow.xaml">
@@ -86,6 +103,14 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="BackupWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="BrowseBackupsControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ConfigBackupControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -101,6 +126,10 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Page Include="RestoreBackupWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs">
@@ -138,9 +167,17 @@
       <Project>{d1334524-78a5-4d16-93bf-27a57c6dbe56}</Project>
       <Name>StdOttFrameworkLib</Name>
     </ProjectReference>
+    <ProjectReference Include="..\StdOttLib\StdOttStandardLib\StdOttStandardLib.csproj">
+      <Project>{b5719f4b-f695-4081-8065-9267cc9ff192}</Project>
+      <Name>StdOttStandardLib</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <Resource Include="icon.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="genericFileThumbnail.png" />
+    <Resource Include="genericFolderThumbnail.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

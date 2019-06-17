@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FolderFileLib", "..\OrdnerD
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StdOttFrameworkLib", "..\StdOttLib\StdOttFrameworkLib\StdOttFrameworkLib.csproj", "{D1334524-78A5-4D16-93BF-27A57C6DBE56}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "StdOttStandardLib", "..\StdOttLib\StdOttStandardLib\StdOttStandardLib.csproj", "{B5719F4B-F695-4081-8065-9267CC9FF192}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{D1334524-78A5-4D16-93BF-27A57C6DBE56}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D1334524-78A5-4D16-93BF-27A57C6DBE56}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D1334524-78A5-4D16-93BF-27A57C6DBE56}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B5719F4B-F695-4081-8065-9267CC9FF192}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B5719F4B-F695-4081-8065-9267CC9FF192}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B5719F4B-F695-4081-8065-9267CC9FF192}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B5719F4B-F695-4081-8065-9267CC9FF192}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
