@@ -72,7 +72,7 @@
     <Compile Include="Backup\Backup.cs" />
     <Compile Include="Backup\BackupFile.cs" />
     <Compile Include="Backup\BackupFolder.cs" />
-    <Compile Include="Backup\Backups.cs" />
+    <Compile Include="Backup\BackupUtils.cs" />
     <Compile Include="Backup\IBackupNode.cs" />
     <Compile Include="BrowseBackupsControl.xaml.cs">
       <DependentUpon>BrowseBackupsControl.xaml</DependentUpon>
