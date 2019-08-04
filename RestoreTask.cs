@@ -88,21 +88,15 @@ namespace BackupApp
 
         private void Restore()
         {
-            Dictionary<string, ZipArchive> zips = new Dictionary<string, ZipArchive>();
+            string srcDirPath = Path.Combine(DestFolder, BackupUtils.BackupFilesDirName);
 
             totalCount = BackupUtils.GetFiles(Node).Count();
-            Restore(Node, DestFolder, DestFolder, zips);
-
-            foreach (ZipArchive zipArchive in zips.Values)
-            {
-                zipArchive.Dispose();
-            }
+            Restore(Node, DestFolder, srcDirPath);
 
             IsRestoring = false;
         }
 
-        private void Restore(IBackupNode node, string currentPath,
-            string srcPath, IDictionary<string, ZipArchive> zips)
+        private void Restore(IBackupNode node, string currentPath, string srcDirPath)
         {
             currentPath = Path.Combine(currentPath, node.Name);
 
@@ -124,52 +118,20 @@ namespace BackupApp
             {
                 if (CancelToken.IsCanceled) return;
 
-                ZipArchive archive;
-                int index = file.SourcePath.IndexOf('/');
-
-                if (index == -1)
-                {
-                    AddError("Index == -1: " + file.SourcePath);
-                    IncreaseCurrentCount();
-                    continue;
-                }
-
-                string zipFileName = file.SourcePath.Remove(index) + BackupUtils.ZipExtension;
-                string entryName = file.SourcePath.Substring(index + 1);
-                string filePath = Path.Combine(currentPath, file.Name);
-
-                if (!zips.TryGetValue(zipFileName, out archive))
-                {
-                    string archiveFileName = Path.Combine(srcPath, zipFileName);
-
-                    try
-                    {
-                        archive = ZipFile.OpenRead(archiveFileName);
-                        zips.Add(zipFileName, archive);
-                    }
-                    catch (Exception e)
-                    {
-                        AddError(archiveFileName + "\r\n" + e);
-                        IncreaseCurrentCount();
-                        continue;
-                    }
-                }
-
-                if (CancelToken.IsCanceled) return;
+                string srcFilePath = Path.Combine(srcDirPath, file.SourcePath);
+                string destFilePath = Path.Combine(currentPath, file.Name);
 
                 try
                 {
-                    ZipArchiveEntry entry = archive.GetEntry(entryName);
+                    CurrentFile = destFilePath;
 
-                    CurrentFile = filePath;
+                    if (File.Exists(destFilePath)) File.Delete(destFilePath);
 
-                    if (File.Exists(filePath)) File.Delete(filePath);
-
-                    entry.ExtractToFile(filePath);
+                    File.Copy(srcFilePath, destFilePath);
                 }
                 catch (Exception e)
                 {
-                    AddError(filePath + "\r\n" + e);
+                    AddError(destFilePath + "\r\n" + e);
                 }
 
                 IncreaseCurrentCount();
@@ -179,7 +141,7 @@ namespace BackupApp
             {
                 if (CancelToken.IsCanceled) return;
 
-                Restore(subFolder, currentPath, srcPath, zips);
+                Restore(subFolder, currentPath, srcDirPath);
             }
         }
 

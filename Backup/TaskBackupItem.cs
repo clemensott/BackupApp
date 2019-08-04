@@ -2,7 +2,6 @@
 using FolderFile;
 using System.ComponentModel;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Collections.Generic;
@@ -62,8 +61,8 @@ namespace BackupApp
             });
         }
 
-        public BackupFolder Backup(ZipArchive archive, string fileName,
-            IDictionary<string, string> backupedFiles, CancelToken cancelToken)
+        public BackupFolder Backup(string dirPath, IDictionary<string, string> backupedFiles,
+            CancelToken cancelToken, List<string> addedFiles)
         {
             currentCount = 0;
 
@@ -87,18 +86,30 @@ namespace BackupApp
             {
                 try
                 {
-                    string sourcePath;
+                    string sourcePath, destPath;
                     string fileHash = GetHash(file.FullName);
 
                     if (backupedFiles.TryGetValue(fileHash, out sourcePath))
                     {
+                        destPath = Path.Combine(dirPath, sourcePath);
+
+                        if (!File.Exists(destPath))
+                        {
+                            File.Copy(file.FullName, destPath);
+                        }
+
                         return new BackupFile(file.Name, sourcePath, fileHash);
                     }
 
-                    archive.CreateEntryFromFile(file.FullName, fileHash, CompressionLevel.Optimal);
+                    sourcePath = fileHash + file.Extension;
+                    destPath = Path.Combine(dirPath, sourcePath);
 
-                    sourcePath = fileName + "/" + fileHash;
+                    if (File.Exists(destPath)) File.Delete(destPath);
+
+                    File.Copy(file.FullName, destPath);
+
                     backupedFiles.Add(fileHash, sourcePath);
+                    addedFiles.Add(destPath);
 
                     return new BackupFile(file.Name, sourcePath, fileHash);
                 }

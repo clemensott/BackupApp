@@ -3,9 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using StdOttStandard;
 
@@ -174,8 +172,10 @@ namespace BackupApp
                 return null;
             }
 
-            bool compressDirect = CompressDirect ?? ShouldCompressDirect();
+            bool compressDirect = true;     // CompressDirect ?? ShouldCompressDirect();
             string tmpZipPath = GetTmpFilePath(compressDirect);
+
+            tmpZipPath = Path.Combine(DestFolder.FullName, BackupUtils.BackupFilesDirName);
             Backup backup = await CreateBackup(tmpZipPath, backupedFiles);
 
             if (backup == null) return null;
@@ -268,45 +268,36 @@ namespace BackupApp
             return backup;
         }
 
-        private async Task<Backup> CreateBackup(string zipFilePath, IDictionary<string, string> backupedFiles)
+        private async Task<Backup> CreateBackup(string backupFilesDir, IDictionary<string, string> backupedFiles)
         {
-            DebugEvent.SaveText("CreateBackup", "Path: " + zipFilePath);
+            DebugEvent.SaveText("CreateBackup", "Path: " + backupFilesDir);
 
             BackupFolder[] folders;
-            bool hasEntries = false;
+            List<string> addedFiles = new List<string>();
             DateTime timestamp = DateTime.Now;
-            string fileName = BackupUtils.ConvertDateTimeOfBackupToString(timestamp);
 
             try
             {
                 Dictionary<Task, TaskBackupItem> dict = Items.ToDictionary(i => i.BeginBackup());
 
-                using (Stream stream = new FileStream(zipFilePath, FileMode.Create))
+                folders = await System.Threading.Tasks.Task.Run(async () =>
                 {
-                    using (ZipArchive archive = new ZipArchive(stream, ZipArchiveMode.Create, false, Encoding.UTF8))
+                    int i = 0;
+                    BackupFolder[] backupFolders = new BackupFolder[dict.Count];
+
+                    while (!CancelToken.IsCanceled && dict.Count > 0)
                     {
-                        folders = await System.Threading.Tasks.Task.Run(async () =>
-                        {
-                            int i = 0;
-                            BackupFolder[] backupFolders = new BackupFolder[dict.Count];
+                        Task filesLoadedTask = await System.Threading.Tasks.Task.WhenAny(dict.Keys);
 
-                            while (!CancelToken.IsCanceled && dict.Count > 0)
-                            {
-                                Task filesLoadedTask = await System.Threading.Tasks.Task.WhenAny(dict.Keys);
+                        if (CancelToken.IsCanceled) break;
 
-                                if (CancelToken.IsCanceled) break;
+                        backupFolders[i++] = dict[filesLoadedTask].Backup(backupFilesDir, backupedFiles, CancelToken, addedFiles);
 
-                                backupFolders[i++] = dict[filesLoadedTask].Backup(archive, fileName, backupedFiles, CancelToken);
-
-                                dict.Remove(filesLoadedTask);
-                            }
-
-                            hasEntries = backupedFiles.Values.Any(p => p.StartsWith(fileName));
-
-                            return backupFolders;
-                        });
+                        dict.Remove(filesLoadedTask);
                     }
-                }
+
+                    return backupFolders;
+                });
             }
             catch (Exception e)
             {
@@ -315,11 +306,14 @@ namespace BackupApp
                 folders = null;
             }
 
-            if (hasEntries && !CancelToken.IsCanceled) return new Backup(timestamp, folders);
+            if (addedFiles.Count > 0 && !CancelToken.IsCanceled) return new Backup(timestamp, folders);
 
             try
             {
-                File.Delete(zipFilePath);
+                foreach (string addedFile in addedFiles)
+                {
+                    File.Delete(addedFile);
+                }
             }
             catch (Exception e)
             {
