@@ -91,13 +91,6 @@ namespace BackupApp
 
                     if (backupedFiles.TryGetValue(fileHash, out sourcePath))
                     {
-                        destPath = Path.Combine(dirPath, sourcePath);
-
-                        if (!File.Exists(destPath))
-                        {
-                            File.Copy(file.FullName, destPath);
-                        }
-
                         return new BackupFile(file.Name, sourcePath, fileHash);
                     }
 
