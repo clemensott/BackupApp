@@ -3,14 +3,14 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using FolderFile;
-using StdOttStandard;
+using StdOttStandard.AsyncResult;
 
 namespace BackupApp
 {
     public class FolderAsync
     {
-        private readonly SetableValue<FolderAsync[]> foldersSetter;
-        private readonly SetableValue<FileInfo[]> filesSetter;
+        private readonly AsyncResult<FolderAsync[]> foldersSetter;
+        private readonly AsyncResult<FileInfo[]> filesSetter;
 
         public DirectoryInfo Info { get; }
 
@@ -21,8 +21,8 @@ namespace BackupApp
         private FolderAsync(DirectoryInfo info)
         {
             Info = info;
-            foldersSetter = new SetableValue<FolderAsync[]>();
-            filesSetter = new SetableValue<FileInfo[]>();
+            foldersSetter = new AsyncResult<FolderAsync[]>();
+            filesSetter = new AsyncResult<FileInfo[]>();
         }
 
         public static FolderAsync FromDirectory(Folder folder, out Task loadTask)

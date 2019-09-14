@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
-using StdOttStandard;
+using StdOttStandard.AsyncResult;
 
 namespace BackupApp
 {
@@ -19,18 +19,18 @@ namespace BackupApp
 
         }
 
-        public SetableValue<bool> IsAccepted { get; private set; }
+        public AsyncResult<bool> IsAccepted { get; private set; }
 
         public BackupTimesWindow()
         {
             InitializeComponent();
         }
 
-        public SetableValue<bool> SetBackupTimes(OffsetIntervalViewModel value)
+        public AsyncResult<bool> SetBackupTimes(OffsetIntervalViewModel value)
         {
             BackupTimes = value;
 
-            return IsAccepted = new SetableValue<bool>();
+            return IsAccepted = new AsyncResult<bool>();
         }
 
         private void OK_Click(object sender, RoutedEventArgs e)

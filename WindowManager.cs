@@ -7,7 +7,7 @@ using System.Windows;
 using System.Windows.Forms;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
-using StdOttStandard;
+using StdOttStandard.AsyncResult;
 
 namespace BackupApp
 {
@@ -274,7 +274,7 @@ namespace BackupApp
 
         public async Task<bool> SetBackupTimes(OffsetIntervalViewModel backupTimes)
         {
-            SetableValue<bool> value = timesWindows.SetBackupTimes(backupTimes);
+            AsyncResult<bool> value = timesWindows.SetBackupTimes(backupTimes);
 
             await value.Task;
 
