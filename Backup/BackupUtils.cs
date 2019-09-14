@@ -11,7 +11,7 @@ namespace BackupApp
     public static class BackupUtils
     {
         private const int folderDepthChars = 3;
-        public const string ZipExtension = ".zip", TxtExtension = ".txt", BackupFilesDirName = "files";
+        public const string TxtExtension = ".txt", BackupFilesDirName = "files";
 
         public static IDictionary<string, string> GetFiles(IEnumerable<Backup> backups)
         {
@@ -62,8 +62,7 @@ namespace BackupApp
             IEnumerable<Task<Backup>> backupTasks = files
                 .Select(file => Task.Run(() =>
                 {
-                    if (!file.EndsWith(TxtExtension)
-                    /*||                        !files.Contains(file.Remove(file.Length - TxtExtension.Length) + ZipExtension)*/) return null;
+                    if (!file.EndsWith(TxtExtension)) return null;
 
                     try
                     {

@@ -172,64 +172,20 @@ namespace BackupApp
                 return null;
             }
 
-            bool compressDirect = true;     // CompressDirect ?? ShouldCompressDirect();
-            string tmpZipPath = GetTmpFilePath(compressDirect);
+            //bool compressDirect = CompressDirect ?? ShouldCompressDirect();
+            //string filesBackupDir = GetTmpFilePath(compressDirect);
 
-            tmpZipPath = Path.Combine(DestFolder.FullName, BackupUtils.BackupFilesDirName);
-            Backup backup = await CreateBackup(tmpZipPath, backupedFiles);
+            List<string> addedFiles = new List<string>();
+            string filesBackupDir = Path.Combine(DestFolder.FullName, BackupUtils.BackupFilesDirName);
+            Backup backup = await CreateBackup(filesBackupDir, backupedFiles, addedFiles);
 
             if (backup == null) return null;
 
             string backupPath = Path.Combine(DestFolder.FullName, backup.Name + BackupUtils.TxtExtension);
-            string zipPath = Path.Combine(DestFolder.FullName, backup.Name + BackupUtils.ZipExtension);
 
             try
             {
                 IsMoving = true;
-
-                if (compressDirect) File.Move(tmpZipPath, zipPath);
-                else
-                {
-                    using (Stream writer = new FileStream(zipPath, FileMode.CreateNew))
-                    {
-                        using (Stream reader = new FileStream(tmpZipPath, FileMode.Open))
-                        {
-                            Task writeTask = System.Threading.Tasks.Task.CompletedTask;
-                            byte[] buffer = new byte[GetBufferSize(reader.Length)];
-
-                            while (reader.Position < reader.Length)
-                            {
-                                int readCount = await reader.ReadAsync(buffer, 0, buffer.Length);
-
-                                await writeTask;
-
-                                if (CancelToken.IsCanceled) break;
-
-                                MoveProgress = Math.Round(reader.Position / (double)reader.Length, 2);
-
-                                writeTask = writer.WriteAsync(buffer, 0, readCount);
-                            }
-                        }
-                    }
-
-                    try
-                    {
-                        if (CancelToken.IsCanceled) File.Delete(zipPath);
-                    }
-                    catch (Exception e)
-                    {
-                        DebugEvent.SaveText("DeleteZipFileAfterCopyException", CancelToken.IsCanceled, e.ToString());
-                    }
-
-                    try
-                    {
-                        File.Delete(tmpZipPath);
-                    }
-                    catch (Exception e)
-                    {
-                        DebugEvent.SaveText("DeleteTmpFileAfterCopyException", e.ToString());
-                    }
-                }
 
                 string backupText = BackupUtils.Serialize(backup);
                 File.WriteAllText(backupPath, backupText);
@@ -248,32 +204,34 @@ namespace BackupApp
 
                 try
                 {
-                    File.Delete(tmpZipPath);
+                    File.Delete(backupPath);
                 }
                 catch (Exception e1)
                 {
-                    DebugEvent.SaveText("HandleBackupMoveDeleteTmpException", e1.ToString());
+                    DebugEvent.SaveText("HandleBackupMoveDeleteBackupException", e1.ToString());
                 }
 
                 try
                 {
-                    File.Delete(zipPath);
+                    foreach (string addedFile in addedFiles)
+                    {
+                        File.Delete(addedFile);
+                    }
                 }
                 catch (Exception e2)
                 {
-                    DebugEvent.SaveText("HandleBackupMoveDeleteZipException", e2.ToString());
+                    DebugEvent.SaveText("HandleBackupMoveDeleteAddedFilesException", e2.ToString());
                 }
             }
 
             return backup;
         }
 
-        private async Task<Backup> CreateBackup(string backupFilesDir, IDictionary<string, string> backupedFiles)
+        private async Task<Backup> CreateBackup(string backupFilesDir, IDictionary<string, string> backupedFiles, List<string> addedFiles)
         {
             DebugEvent.SaveText("CreateBackup", "Path: " + backupFilesDir);
 
             BackupFolder[] folders;
-            List<string> addedFiles = new List<string>();
             DateTime timestamp = DateTime.Now;
 
             try
