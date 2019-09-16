@@ -78,7 +78,7 @@ namespace BackupApp
                 backupTimes = value;
                 OnPropertyChanged(nameof(BackupTimes));
 
-                NextScheduledBackup = BackupTimes.Next;
+                UpdateNextScheduledBackup();
             }
         }
 

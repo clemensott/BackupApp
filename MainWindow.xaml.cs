@@ -284,7 +284,7 @@ namespace BackupApp
             if (viewModel.NextScheduledBackup <= DateTime.Now)
             {
                 if (viewModel.IsBackupEnabled) BackupAsync();
-                else viewModel.NextScheduledBackup = viewModel.BackupTimes.Next;
+                else viewModel.UpdateNextScheduledBackup();
             }
             else SetTimer();
         }

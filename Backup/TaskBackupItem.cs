@@ -97,9 +97,15 @@ namespace BackupApp
                     sourcePath = fileHash + file.Extension;
                     destPath = Path.Combine(dirPath, sourcePath);
 
-                    if (File.Exists(destPath)) File.Delete(destPath);
-
-                    File.Copy(file.FullName, destPath);
+                    if (File.Exists(destPath))
+                    {
+                        if (fileHash != GetHash(fileHash))
+                        {
+                            File.Delete(destPath);
+                            File.Copy(file.FullName, destPath);
+                        }
+                    }
+                    else File.Copy(file.FullName, destPath);
 
                     backupedFiles.Add(fileHash, sourcePath);
                     addedFiles.Add(destPath);

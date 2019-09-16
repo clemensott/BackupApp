@@ -224,6 +224,8 @@ namespace BackupApp
             await ShowBackupWindow(task);
             await task.Task;
             await HideBackupWindow();
+
+            viewModel.UpdateNextScheduledBackup();
         }
 
         private DispatcherOperation ShowBackupWindow(BackupTask task)
