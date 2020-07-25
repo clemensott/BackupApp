@@ -6,7 +6,7 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using StdOttStandard;
+using StdOttStandard.Linq;
 
 namespace BackupApp
 {
@@ -56,7 +56,7 @@ namespace BackupApp
             return Task.Run(() =>
             {
                 baseFolder = BackupFolder.FromPath(Folder);
-                totalCount = baseFolder.SelectRecursive(f => f.Folders)
+                totalCount = GenerateUtils.SelectRecursive(baseFolder, f => f.Folders)
                     .SelectMany(f => f.Files).Count();
             });
         }

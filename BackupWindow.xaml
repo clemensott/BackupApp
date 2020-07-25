@@ -5,14 +5,13 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:BackupApp"
         xmlns:con="clr-namespace:StdOttFramework.Converters;assembly=StdOttFrameworkLib"
-        xmlns:spi="clr-namespace:StdOttFramework.Converters.Specialized;assembly=StdOttFrameworkLib"
         mc:Ignorable="d"
         Title="Backup" Height="300" Width="300">
 
     <Window.Resources>
         <local:ProgressTextConverter x:Key="progressCon"/>
-        <con:InvertConverter x:Key="invCon"/>
-        <spi:VisibleHiddenConverter x:Key="visCon"/>
+        <con:FalsyConverter x:Key="invCon"/>
+        <con:VisibleHiddenConverter x:Key="visCon"/>
     </Window.Resources>
 
     <Grid>

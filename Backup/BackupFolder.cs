@@ -2,7 +2,7 @@
 using System.IO;
 using System.Linq;
 using FolderFile;
-using StdOttStandard;
+using StdOttStandard.Linq;
 
 namespace BackupApp
 {

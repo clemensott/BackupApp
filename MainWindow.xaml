@@ -10,7 +10,7 @@
         Title="Backomat" Height="450" Width="825">
 
     <Window.Resources>
-        <con:IsNotNullConverter x:Key="loadingCon"/>
+        <con:FalsyConverter x:Key="loadingCon" DecideType="IsNull"/>
     </Window.Resources>
 
     <Grid IsEnabled="{Binding Converter={StaticResource loadingCon}}">

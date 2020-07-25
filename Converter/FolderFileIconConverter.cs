@@ -17,7 +17,7 @@ namespace BackupApp
 
             try
             {
-                string fullPath = Utils.GetFullPath("genericFolderThumbnail.png");
+                string fullPath = FrameworkUtils.GetFullPathToExe("genericFolderThumbnail.png");
                 return folderImg = new BitmapImage(new Uri(fullPath));
             }
             catch
@@ -32,7 +32,7 @@ namespace BackupApp
 
             try
             {
-                string fullPath = Utils.GetFullPath("genericFileThumbnail.png");
+                string fullPath = FrameworkUtils.GetFullPathToExe("genericFileThumbnail.png");
                 return fileImg = new BitmapImage(new Uri(fullPath));
             }
             catch

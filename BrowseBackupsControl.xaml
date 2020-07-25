@@ -10,7 +10,7 @@
 
     <UserControl.Resources>
         <local:FolderFileIconConverter x:Key="iconCon"/>
-        <con:IsNotNullConverter x:Key="isNotNullCon"/>
+        <con:FalsyConverter x:Key="isNotNullCon" DecideType="IsNull"/>
     </UserControl.Resources>
 
     <Grid Name="gidMain">
