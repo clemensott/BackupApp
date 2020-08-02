@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using BackupApp.Restore;
 using StdOttFramework;
 
 namespace BackupApp
@@ -17,7 +18,7 @@ namespace BackupApp
 
             try
             {
-                string fullPath = FrameworkUtils.GetFullPathToExe("genericFolderThumbnail.png");
+                string fullPath = FrameworkUtils.GetFullPathToExe("Assets\\genericFolderThumbnail.png");
                 return folderImg = new BitmapImage(new Uri(fullPath));
             }
             catch
@@ -32,7 +33,7 @@ namespace BackupApp
 
             try
             {
-                string fullPath = FrameworkUtils.GetFullPathToExe("genericFileThumbnail.png");
+                string fullPath = FrameworkUtils.GetFullPathToExe("Assets\\genericFileThumbnail.png");
                 return fileImg = new BitmapImage(new Uri(fullPath));
             }
             catch
@@ -43,7 +44,7 @@ namespace BackupApp
 
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            return value is IBackupNode ? GetFolderImage() : GetFileImage();
+            return value is RestoreNode ? GetFolderImage() : GetFileImage();
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

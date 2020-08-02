@@ -1,16 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
-using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
-using System.Linq;
 using System.Threading.Tasks;
-using System.Timers;
 using System.Windows;
-using System.Xml.Serialization;
-using FolderFile;
-using Microsoft.Win32;
+using System.Windows.Threading;
+using BackupApp.Backup.Config;
+using BackupApp.Backup.Handling;
+using BackupApp.Backup.Result;
+using BackupApp.LocalSave;
+using BackupApp.Restore;
+using BackupApp.Restore.Caching;
+using BackupApp.Restore.Handling;
 
 namespace BackupApp
 {
@@ -19,328 +20,144 @@ namespace BackupApp
     /// </summary>
     public partial class MainWindow : Window
     {
-        private const string dataFilename = "Data.xml";
-        private static readonly XmlSerializer serializer = new XmlSerializer(typeof(Settings));
+        private const string dataFilename = "Data.xml", restoreDbFilename = "D:\\restore_cache.db";
 
         private ViewModel viewModel;
-        private Timer timer;
+        private readonly DispatcherTimer timer;
 
         public MainWindow()
         {
             InitializeComponent();
+
+            timer = new DispatcherTimer();
+            timer.Interval = TimeSpan.FromMinutes(1);
+            timer.Tick += Timer_Tick;
+            timer.Start();
 
             SetViewModel();
         }
 
         private async void SetViewModel()
         {
-            DataContext = viewModel = await LoadViewModel();
+            LoadSaveHandler loadSaveHandler = await LoadSaveHandler.Load(dataFilename);
+            loadSaveHandler.Model.RestoreDb = await RestoreDb.Open(restoreDbFilename);
 
-            Subscribe(viewModel);
+            loadSaveHandler.Model.PropertyChanged += Model_PropertyChanged;
+            DataContext = viewModel = loadSaveHandler.Model;
 
-            WindowManager.CreateInstance(this, viewModel);
-
-            SystemEvents.PowerModeChanged += OnPowerChange;
-            CheckForBackup();
-        }
-
-        private async Task<ViewModel> LoadViewModel()
-        {
-            bool isHidden = false;
-            bool isEnabled = false;
-            bool? compressDirect = true;
-            OffsetIntervalViewModel backupTimes = new OffsetIntervalViewModel(TimeSpan.Zero, TimeSpan.FromDays(1));
-            DateTime nextScheduledBackup = backupTimes.Next;
-            Folder backupDestFolder = null;
-            IEnumerable<BackupItem> backupItems = new BackupItem[0];
-
-            try
+            string destFolderPath = viewModel.BackupDestFolder?.FullName;
+            if (!string.IsNullOrWhiteSpace(destFolderPath))
             {
-                Settings settings = LoadSettings(dataFilename);
-
-                if (settings.IsHidden) Hide();
-
-                await Task.Run(() =>
-                {
-                    isHidden = settings.IsHidden;
-                    isEnabled = settings.IsEnabled;
-                    compressDirect = settings.CompressDirect;
-                    backupTimes = (OffsetIntervalViewModel)settings.BackupTimes;
-                    nextScheduledBackup = new DateTime(settings.ScheduledBackupTicks);
-                    backupDestFolder = Folder.CreateOrDefault(settings.BackupDestFolder);
-                    backupItems = settings.Items;
-                });
+                viewModel.CachingTask = FolderCachingTask.Run(destFolderPath, viewModel.RestoreDb);
             }
-            catch { }
 
-            return new ViewModel(isHidden, isEnabled, compressDirect,
-                backupTimes, nextScheduledBackup, backupDestFolder, backupItems);
-        }
+            WindowManager.Start(this, viewModel);
 
-        private static Settings LoadSettings(string path)
-        {
-            using (Stream stream = File.OpenRead(path))
+            await CheckForBackup();
+
+            if (viewModel.CachingTask != null)
             {
-                return (Settings)serializer.Deserialize(stream);
+                string testDbPath = @"D:\bak.db";
+                if (File.Exists(testDbPath)) File.Delete(testDbPath);
+                RestoreDb db = await RestoreDb.Open(testDbPath);
+                string[] testLines = File.ReadAllLines(@"Z:\Backup\Clemens\X1\2020-08-02_15-17-29.txt");
+
+                await Task.Run(() => db.InsertBackupTest(testLines));
             }
         }
 
-        private void Subscribe(ViewModel viewModel)
+        private async void Model_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            if (viewModel == null) return;
+            string destFolderPath;
+            BackupTask backupTask;
+            CachingTask cachingTask;
 
-            viewModel.PropertyChanged += ViewModel_PropertyChanged;
-
-            Subscribe(viewModel.BackupTimes);
-            Subscribe(viewModel.BackupDestFolder);
-            Subscribe(viewModel.BackupItems);
-        }
-
-        private void Unsubscribe(ViewModel viewModel)
-        {
-            if (viewModel == null) return;
-
-            viewModel.PropertyChanged -= ViewModel_PropertyChanged;
-
-            Unsubscribe(viewModel.BackupTimes);
-            Unsubscribe(viewModel.BackupDestFolder);
-            Unsubscribe(viewModel.BackupItems);
-        }
-
-        private void Subscribe(OffsetIntervalViewModel oivm)
-        {
-            if (oivm != null) oivm.PropertyChanged += Oivm_PropertyChanged;
-        }
-
-        private void Unsubscribe(OffsetIntervalViewModel oivm)
-        {
-            if (oivm != null) oivm.PropertyChanged -= Oivm_PropertyChanged;
-        }
-
-        private void Subscribe(Folder folder)
-        {
-            if (folder != null) folder.PropertyChanged += Folder_PropertyChanged;
-        }
-
-        private void Unsubscribe(Folder folder)
-        {
-            if (folder != null) folder.PropertyChanged -= Folder_PropertyChanged;
-        }
-
-        private void Subscribe(ObservableCollection<BackupItem> backupItems)
-        {
-            if (backupItems == null) return;
-
-            backupItems.CollectionChanged += BackupItems_CollectionChanged;
-
-            foreach (BackupItem item in backupItems) Subscribe(item);
-        }
-
-        private void Unsubscribe(ObservableCollection<BackupItem> backupItems)
-        {
-            if (backupItems == null) return;
-
-            backupItems.CollectionChanged -= BackupItems_CollectionChanged;
-
-            foreach (BackupItem item in backupItems) Unsubscribe(item);
-        }
-
-        private void Subscribe(BackupItem item)
-        {
-            if (item == null) return;
-
-            item.PropertyChanged += BackupItem_PropertyChanged;
-            Subscribe(item.Folder);
-        }
-
-        private void Unsubscribe(BackupItem item)
-        {
-            if (item == null) return;
-
-            item.PropertyChanged -= BackupItem_PropertyChanged;
-            Unsubscribe(item.Folder);
-        }
-
-        private void ViewModel_PropertyChanged(object sender, PropertyChangedEventArgs e)
-        {
             switch (e.PropertyName)
             {
-                case nameof(viewModel.IsHidden):
-                case nameof(viewModel.IsBackupEnabled):
-                case nameof(viewModel.CompressDirect):
-                case nameof(viewModel.NextScheduledBackup):
-                    Save();
-                    break;
-
                 case nameof(viewModel.BackupDestFolder):
-                    Subscribe(viewModel.BackupDestFolder);
-                    Save();
+                    destFolderPath = viewModel.BackupDestFolder?.FullName;
+                    if (!string.IsNullOrWhiteSpace(destFolderPath))
+                    {
+                        viewModel.CachingTask = FolderCachingTask.Run(destFolderPath, viewModel.RestoreDb);
+                    }
                     break;
 
-                case nameof(viewModel.BackupTimes):
-                    Subscribe(viewModel.BackupTimes);
-                    Save();
+                case nameof(viewModel.CachingTask):
+                    cachingTask = viewModel.CachingTask;
+                    await cachingTask.Task;
+                    if (viewModel.CachingTask == cachingTask) await bbc.ReloadBackups();
+                    break;
+
+                case nameof(viewModel.BackupTask):
+                    backupTask = viewModel.BackupTask;
+                    destFolderPath = viewModel.BackupDestFolder?.FullName;
+
+                    BackupModel backup = await backupTask.Task;
+
+                    if (backup != null && viewModel.RestoreDb != null && destFolderPath == viewModel.BackupDestFolder?.FullName)
+                    {
+                        cachingTask = BackupsCachingTask.Run(new BackupModel[] { backup }, viewModel.RestoreDb);
+                        viewModel.CachingTask = cachingTask;
+                        await cachingTask.Task;
+                        await bbc.ReloadBackups();
+                    }
                     break;
             }
-
-            if (e.PropertyName == nameof(viewModel.IsBackupEnabled) ||
-                e.PropertyName == nameof(viewModel.NextScheduledBackup)) CheckForBackup();
         }
 
-        private void Oivm_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        private async void Timer_Tick(object sender, EventArgs e)
         {
-            OffsetIntervalViewModel oivm = (OffsetIntervalViewModel)sender;
-
-            if (viewModel.BackupTimes != oivm) Unsubscribe(oivm);
-            else if (e.PropertyName == nameof(oivm.Interval) || e.PropertyName == nameof(oivm.Offset)) Save();
+            await CheckForBackup();
         }
 
-        private void Folder_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        private async Task CheckForBackup()
         {
-            Folder folder = (Folder)sender;
+            DebugEvent.SaveText("CheckForBackup", "NextBackup: " + viewModel.Config?.NextScheduledBackup);
 
-            if (folder == viewModel.BackupDestFolder || viewModel.BackupItems.Any(i => i.Folder == folder))
-            {
-                if (e.PropertyName == nameof(folder.SubType)) Save();
-            }
-            else folder.PropertyChanged -= Folder_PropertyChanged;
+            BackupConfig config = viewModel.Config;
+            if (config == null || config.NextScheduledBackup > DateTime.Now) return;
+
+            if (config.IsBackupEnabled && viewModel.BackupTask?.IsBackuping != true) await BackupAsync();
+            else config.UpdateNextScheduledBackup();
         }
 
-        private void BackupItems_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
-        {
-            foreach (BackupItem item in e.NewItems?.Cast<BackupItem>() ?? Enumerable.Empty<BackupItem>())
-            {
-                Subscribe(item);
-            }
-
-            foreach (BackupItem item in e.OldItems?.Cast<BackupItem>() ?? Enumerable.Empty<BackupItem>())
-            {
-                Subscribe(item);
-            }
-
-            Save();
-        }
-
-        private void BackupItem_PropertyChanged(object sender, PropertyChangedEventArgs e)
-        {
-            BackupItem item = (BackupItem)sender;
-
-            if (e.PropertyName == nameof(item.Name)) Save();
-            else if (e.PropertyName == nameof(item.Folder))
-            {
-                Subscribe(item.Folder);
-                Save();
-            }
-        }
-
-        private void Save()
-        {
-            System.Diagnostics.Debug.WriteLine("Save");
-
-            Settings settings = new Settings()
-            {
-                IsHidden = viewModel.IsHidden,
-                IsEnabled = viewModel.IsBackupEnabled,
-                CompressDirect = viewModel.CompressDirect,
-                BackupTimes = (OffsetInterval)viewModel.BackupTimes,
-                ScheduledBackupTicks = viewModel.NextScheduledBackup.Ticks,
-                BackupDestFolder = (SerializableFolder?)viewModel.BackupDestFolder,
-                Items = viewModel.BackupItems.ToArray()
-            };
-
-            SaveSettings(settings, dataFilename);
-        }
-
-        private static void SaveSettings(Settings settings, string path)
+        private async Task BackupAsync()
         {
             try
             {
-                lock (serializer)
-                {
-                    using (Stream stream = new FileStream(path, FileMode.Create))
-                    {
-                        serializer.Serialize(stream, settings);
-                    }
-                }
+                return;
+                btnStartBackup.IsEnabled = false;
+
+                if (viewModel.CachingTask != null) await viewModel.CachingTask.Task;
+
+                IDictionary<string, string> dict = await viewModel.RestoreDb.GetAllFiles();
+                BackupedFiles files = new BackupedFiles(dict);
+                BackupTask task = BackupTask.Run(viewModel.BackupDestFolder, viewModel.Config?.BackupItems, files);
+                viewModel.BackupTask = task;
+
+                await task.Task;
             }
-            catch { }
-        }
-
-        private async void OnPowerChange(object sender, PowerModeChangedEventArgs e)
-        {
-            DebugEvent.SaveText("OnPowerChange");
-
-            if (e.Mode != PowerModes.Resume) return;
-
-            await Task.Delay(TimeSpan.FromSeconds(10));
-
-            CheckForBackup();
-        }
-
-        private void CheckForBackup()
-        {
-            DebugEvent.SaveText("CheckForBackup", "NextBackup: " + viewModel.NextScheduledBackup);
-
-            if (viewModel.NextScheduledBackup <= DateTime.Now)
+            finally
             {
-                if (viewModel.IsBackupEnabled) BackupAsync();
-                else viewModel.UpdateNextScheduledBackup();
+                btnStartBackup.IsEnabled = true;
             }
-            else SetTimer();
-        }
-
-        private BackupTask BackupAsync()
-        {
-            BackupTask task = BackupTask.Run(viewModel.BackupDestFolder,
-                viewModel.BackupItems, viewModel.CompressDirect);
-
-            WindowManager.Current.SetBackupTask(task);
-
-            UpdateBackupBrowser(task);
-
-            return task;
-        }
-
-        private async void UpdateBackupBrowser(BackupTask task)
-        {
-            await task.Task;
-            await bbcBackups.UpdateBackups();
-        }
-
-        private void SetTimer()
-        {
-            DebugEvent.SaveText("SetTimer");
-
-            timer?.Dispose();
-
-            double interval = Math.Max((viewModel.NextScheduledBackup - DateTime.Now).TotalMilliseconds, 0);
-
-            timer = new Timer
-            {
-                AutoReset = false,
-                Enabled = true,
-                Interval = interval
-            };
-
-            timer.Elapsed += Timer_Elapsed;
-            timer.Start();
-        }
-
-        private void Timer_Elapsed(object sender, ElapsedEventArgs e)
-        {
-            CheckForBackup();
         }
 
         protected override void OnClosed(EventArgs e)
         {
-            timer?.Dispose();
+            timer.Stop();
 
             base.OnClosed(e);
         }
 
-        private void BtnBackupNow_Click(object sender, RoutedEventArgs e)
+        private async void BtnBackupNow_Click(object sender, RoutedEventArgs e)
         {
-            BackupAsync();
+            await BackupAsync();
+        }
+
+        private void BrowseBackupsControl_Restore(object sender, RestoreNode e)
+        {
+            viewModel.RestoreTask = RestoreTask.Run(viewModel.BackupDestFolder.FullName, e);
         }
     }
 }

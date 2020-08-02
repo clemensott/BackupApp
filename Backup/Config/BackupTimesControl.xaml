@@ -1,0 +1,48 @@
+﻿<UserControl x:Class="BackupApp.Backup.Config.BackupTimesControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:BackupApp"
+             mc:Ignorable="d" 
+             d:DesignHeight="050" d:DesignWidth="650">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="5"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="5"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="5"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="5"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="2"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Column="0" Grid.Row="0" Text="Next Backup:"/>
+        <DatePicker Grid.Column="0" Grid.Row="2" Name="dprNextDate"/>
+
+        <TextBlock Grid.Column="2" Grid.Row="0" Text="hh:mm:ss" HorizontalAlignment="Center"/>
+        <TextBox Grid.Column="2" Grid.Row="2" Name="tbxNextTime" Width="100" 
+                 TextAlignment="Center" LostFocus="TbxNextTime_LostFocus"
+                 KeyUp="TbxNextTime_KeyUp"/>
+
+        <TextBlock Grid.Column="4" Grid.Row="0" Text="Interval: d:hh:mm:ss"
+                       VerticalAlignment="Center" HorizontalAlignment="Center"/>
+        <TextBox Grid.Column="4" Grid.Row="2" Name="tbxInterval"
+                 Width="150" HorizontalAlignment="Left" TextAlignment="Center"
+                 LostFocus="TbxInterval_LostFocus" KeyUp="TbxInterval_KeyUp"/>
+
+        <Button Grid.Column="6" Grid.RowSpan="3" Content="OK" Width="100"
+                VerticalAlignment="Bottom" Click="BtnApplyTimes_Click"/>
+
+        <Button Grid.Column="8" Grid.RowSpan="3" Content="Cancel" Width="100"
+                VerticalAlignment="Bottom" Click="BtnCancelTimes_Click"/>
+    </Grid>
+</UserControl>

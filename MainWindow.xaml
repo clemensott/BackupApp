@@ -4,13 +4,24 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:BackupApp"
+        xmlns:config="clr-namespace:BackupApp.Backup.Config"
+        xmlns:bakHandle="clr-namespace:BackupApp.Backup.Handling"
+        xmlns:restore="clr-namespace:BackupApp.Restore"
+        xmlns:cache="clr-namespace:BackupApp.Restore.Caching"
+        xmlns:reHandle="clr-namespace:BackupApp.Restore.Handling"
         xmlns:ff="clr-namespace:FolderFile;assembly=FolderFileLib"
         xmlns:con="clr-namespace:StdOttFramework.Converters;assembly=StdOttFrameworkLib"
+        xmlns:win="clr-namespace:System.Windows;assembly=PresentationCore"
         mc:Ignorable="d"
         Title="Backomat" Height="450" Width="825">
 
     <Window.Resources>
+        <con:VisibleCollapsedConverter x:Key="isTrueCon" DecideType="True"/>
+        <con:CollapsedVisibleConverter x:Key="isNotTrueCon" DecideType="True"/>
         <con:FalsyConverter x:Key="loadingCon" DecideType="IsNull"/>
+
+        <win:Visibility x:Key="visible">Visible</win:Visibility>
+        <win:Visibility x:Key="collapsed">Collapsed</win:Visibility>
     </Window.Resources>
 
     <Grid IsEnabled="{Binding Converter={StaticResource loadingCon}}">
@@ -20,21 +31,45 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="Path for Backups:" Margin="10,5,10,0"/>
+        <TextBlock Grid.Row="0" Text="Path for Backups:" Margin="5,0" VerticalAlignment="Bottom"/>
         <ff:FolderPicker Grid.Row="1" Margin="5" SubTypeSelection="Hidden"
                          IsRefreshButtonVisible="false" AutoRefreshSelection="ForceFalse"
                          Folder="{Binding BackupDestFolder,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}"/>
 
-        <Button Grid.Row="0" Content="Backup Now" HorizontalAlignment="Right"
-                Width="100" Margin="5,0" Click="BtnBackupNow_Click"/>
+        <Button Grid.Row="0" Name="btnStartBackup" Content="Backup Now" HorizontalAlignment="Right"
+                Width="100" Margin="5" Click="BtnBackupNow_Click"/>
 
         <TabControl Grid.Row="2">
-            <TabItem Header="Config">
-                <local:ConfigBackupControl />
+            <TabItem Header="Backup">
+                <Grid>
+                    <config:ConfigBackupControl Config="{Binding Config}"
+                                                Visibility="{Binding BackupTask.IsBackuping,
+                                                  Converter={StaticResource isNotTrueCon},
+                                                  FallbackValue={StaticResource visible}}"/>
+
+                    <bakHandle:BackupHandlingControl Task="{Binding BackupTask}"
+                                                     Visibility="{Binding BackupTask.IsBackuping,
+                                                       Converter={StaticResource isTrueCon},
+                                                       FallbackValue={StaticResource collapsed}}"/>
+                </Grid>
             </TabItem>
-            <TabItem Header="Read">
-                <local:BrowseBackupsControl x:Name="bbcBackups"
-                                            SrcFolder="{Binding BackupDestFolder.FullName}"/>
+            <TabItem Header="Restore">
+                <Grid>
+                    <restore:BrowseBackupsControl x:Name="bbc" DB="{Binding RestoreDb}"
+                                                  Visibility="{Binding RestoreTask.IsRestoring,
+                                                    Converter={StaticResource isNotTrueCon},
+                                                    FallbackValue={StaticResource visible}}"
+                                                  Restore="BrowseBackupsControl_Restore"/>
+
+                    <reHandle:RestoreBackupControl Task="{Binding RestoreTask}"
+                                                   Visibility="{Binding RestoreTask.IsRestoring,
+                                                     Converter={StaticResource isTrueCon},
+                                                     FallbackValue={StaticResource collapsed}}"/>
+                </Grid>
+            </TabItem>
+            <TabItem Header="Caching" Visibility="{Binding CachingTask.Task.IsCompleted,
+                       Converter={StaticResource isNotTrueCon},FallbackValue={StaticResource collapsed}}">
+                <cache:CachingRestoreDbControl Task="{Binding CachingTask}"/>
             </TabItem>
         </TabControl>
     </Grid>

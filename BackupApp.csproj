@@ -1,5 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="packages\EntityFramework.6.3.0\build\EntityFramework.props" Condition="Exists('packages\EntityFramework.6.3.0\build\EntityFramework.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -15,6 +16,8 @@
     <WarningLevel>4</WarningLevel>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <TargetFrameworkProfile />
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -36,14 +39,43 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>icon.ico</ApplicationIcon>
+    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="EntityFramework, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089, processorArchitecture=MSIL">
+      <HintPath>packages\EntityFramework.6.3.0\lib\net45\EntityFramework.dll</HintPath>
+    </Reference>
+    <Reference Include="EntityFramework.SqlServer, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089, processorArchitecture=MSIL">
+      <HintPath>packages\EntityFramework.6.3.0\lib\net45\EntityFramework.SqlServer.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Buffers, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>packages\System.Buffers.4.5.1\lib\net461\System.Buffers.dll</HintPath>
+    </Reference>
+    <Reference Include="System.ComponentModel.DataAnnotations" />
     <Reference Include="System.Data" />
+    <Reference Include="System.Data.SQLite, Version=1.0.113.0, Culture=neutral, PublicKeyToken=db937bc2d44ff139, processorArchitecture=MSIL">
+      <HintPath>packages\System.Data.SQLite.Core.1.0.113.1\lib\net46\System.Data.SQLite.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Data.SQLite.EF6, Version=1.0.113.0, Culture=neutral, PublicKeyToken=db937bc2d44ff139, processorArchitecture=MSIL">
+      <HintPath>packages\System.Data.SQLite.EF6.1.0.113.0\lib\net46\System.Data.SQLite.EF6.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Data.SQLite.Linq, Version=1.0.113.0, Culture=neutral, PublicKeyToken=db937bc2d44ff139, processorArchitecture=MSIL">
+      <HintPath>packages\System.Data.SQLite.Linq.1.0.113.0\lib\net46\System.Data.SQLite.Linq.dll</HintPath>
+    </Reference>
     <Reference Include="System.Drawing" />
     <Reference Include="System.IO.Compression" />
     <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="System.Memory, Version=4.0.1.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>packages\System.Memory.4.5.4\lib\net461\System.Memory.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Numerics" />
+    <Reference Include="System.Numerics.Vectors, Version=4.1.4.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>packages\System.Numerics.Vectors.4.5.0\lib\net46\System.Numerics.Vectors.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=4.0.6.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>packages\System.Runtime.CompilerServices.Unsafe.4.7.1\lib\net461\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    </Reference>
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
     <Reference Include="Microsoft.CSharp" />
@@ -63,54 +95,66 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
-    <Compile Include="CancelToken.cs" />
-    <Compile Include="Backup\BackupItem.cs" />
-    <Compile Include="Backup\BackupTask.cs" />
-    <Compile Include="BackupWindow.xaml.cs">
-      <DependentUpon>BackupWindow.xaml</DependentUpon>
+    <Compile Include="Backup\Handling\BackupHandlingControl.xaml.cs">
+      <DependentUpon>BackupHandlingControl.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Backup\Backup.cs" />
-    <Compile Include="Backup\BackupFile.cs" />
-    <Compile Include="Backup\BackupFolder.cs" />
-    <Compile Include="Backup\BackupUtils.cs" />
-    <Compile Include="Backup\IBackupNode.cs" />
-    <Compile Include="BrowseBackupsControl.xaml.cs">
+    <Compile Include="Backup\Config\BackupTimesControl.xaml.cs">
+      <DependentUpon>BackupTimesControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Backup\Config\BackupConfig.cs" />
+    <Compile Include="CancelToken.cs" />
+    <Compile Include="Backup\Config\BackupItem.cs" />
+    <Compile Include="Backup\Handling\BackupTask.cs" />
+    <Compile Include="Backup\Result\BackupModel.cs" />
+    <Compile Include="Backup\Result\BackupFile.cs" />
+    <Compile Include="Backup\Result\BackupFolder.cs" />
+    <Compile Include="Helper\BackupUtils.cs" />
+    <Compile Include="Backup\Result\IBackupNode.cs" />
+    <Compile Include="Helper\StreamReaderEnumerator.cs" />
+    <Compile Include="LocalSave\LoadSaveHandler.cs" />
+    <Compile Include="Restore\BrowseBackupsControl.xaml.cs">
       <DependentUpon>BrowseBackupsControl.xaml</DependentUpon>
     </Compile>
-    <Compile Include="ConfigBackupControl.xaml.cs">
+    <Compile Include="Backup\Config\ConfigBackupControl.xaml.cs">
       <DependentUpon>ConfigBackupControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="Converter\DateTimeConverter.cs" />
-    <Compile Include="DebugEvent.cs" />
+    <Compile Include="Helper\DebugEvent.cs" />
     <Compile Include="Converter\FolderFileIconConverter.cs" />
-    <Compile Include="FolderAsync.cs" />
-    <Compile Include="OffsetInterval.cs" />
-    <Compile Include="BackupTimesWindow.xaml.cs">
-      <DependentUpon>BackupTimesWindow.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="OffsetIntervalViewModel.cs" />
+    <Compile Include="Backup\Config\OffsetInterval.cs" />
     <Compile Include="Converter\ProgressTextConverter.cs" />
-    <Compile Include="RestoreBackupWindow.xaml.cs">
-      <DependentUpon>RestoreBackupWindow.xaml</DependentUpon>
+    <Compile Include="Backup\Handling\BackupedFiles.cs" />
+    <Compile Include="Restore\Caching\BackupsCachingTask.cs" />
+    <Compile Include="Restore\Caching\CachingRestoreDbControl.xaml.cs">
+      <DependentUpon>CachingRestoreDbControl.xaml</DependentUpon>
     </Compile>
-    <Compile Include="RestoreTask.cs" />
-    <Compile Include="Settings.cs" />
-    <Compile Include="Backup\TaskBackupItem.cs" />
+    <Compile Include="Restore\Caching\CachingTask.cs" />
+    <Compile Include="Restore\Caching\FolderCachingTask.cs" />
+    <Compile Include="Restore\Caching\RestoreDb.cs" />
+    <Compile Include="Restore\Handling\RestoreBackupControl.xaml.cs">
+      <DependentUpon>RestoreBackupControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Restore\RestoreFile.cs" />
+    <Compile Include="Restore\RestoreNode.cs" />
+    <Compile Include="Restore\Handling\RestoreTask.cs" />
+    <Compile Include="Restore\RestoreUtils.cs" />
+    <Compile Include="LocalSave\Settings.cs" />
+    <Compile Include="Backup\Handling\TaskBackupItem.cs" />
     <Compile Include="ViewModel.cs" />
-    <Compile Include="WindowManager.cs" />
-    <Page Include="BackupTimesWindow.xaml">
+    <Compile Include="Helper\WindowManager.cs" />
+    <Page Include="Backup\Handling\BackupHandlingControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="BackupWindow.xaml">
+    <Page Include="Backup\Config\BackupTimesControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="BrowseBackupsControl.xaml">
+    <Page Include="Restore\BrowseBackupsControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="ConfigBackupControl.xaml">
+    <Page Include="Backup\Config\ConfigBackupControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -126,7 +170,11 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
-    <Page Include="RestoreBackupWindow.xaml">
+    <Page Include="Restore\Caching\CachingRestoreDbControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Restore\Handling\RestoreBackupControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -149,6 +197,7 @@
       <Generator>ResXFileCodeGenerator</Generator>
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
+    <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>
       <LastGenOutput>Settings.Designer.cs</LastGenOutput>
@@ -173,13 +222,30 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="icon.ico" />
+    <Content Include="Assets\icon.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="genericFileThumbnail.png" />
-    <Resource Include="genericFolderThumbnail.png" />
+    <Content Include="Assets\genericFileThumbnail.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Assets\genericFolderThumbnail.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>Dieses Projekt verweist auf mindestens ein NuGet-Paket, das auf diesem Computer fehlt. Verwenden Sie die Wiederherstellung von NuGet-Paketen, um die fehlenden Dateien herunterzuladen. Weitere Informationen finden Sie unter "http://go.microsoft.com/fwlink/?LinkID=322105". Die fehlende Datei ist "{0}".</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('packages\EntityFramework.6.3.0\build\EntityFramework.props')" Text="$([System.String]::Format('$(ErrorText)', 'packages\EntityFramework.6.3.0\build\EntityFramework.props'))" />
+    <Error Condition="!Exists('packages\EntityFramework.6.3.0\build\EntityFramework.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\EntityFramework.6.3.0\build\EntityFramework.targets'))" />
+    <Error Condition="!Exists('packages\System.Data.SQLite.Core.1.0.113.1\build\net46\System.Data.SQLite.Core.targets')" Text="$([System.String]::Format('$(ErrorText)', 'packages\System.Data.SQLite.Core.1.0.113.1\build\net46\System.Data.SQLite.Core.targets'))" />
+  </Target>
+  <Import Project="packages\EntityFramework.6.3.0\build\EntityFramework.targets" Condition="Exists('packages\EntityFramework.6.3.0\build\EntityFramework.targets')" />
+  <Import Project="packages\System.Data.SQLite.Core.1.0.113.1\build\net46\System.Data.SQLite.Core.targets" Condition="Exists('packages\System.Data.SQLite.Core.1.0.113.1\build\net46\System.Data.SQLite.Core.targets')" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">

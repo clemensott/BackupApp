@@ -1,0 +1,80 @@
+﻿<UserControl x:Class="BackupApp.Backup.Config.ConfigBackupControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:BackupApp.Backup.Config"
+             xmlns:base="clr-namespace:BackupApp"
+             xmlns:ff="clr-namespace:FolderFile;assembly=FolderFileLib"
+             xmlns:con="clr-namespace:StdOttFramework.Converters;assembly=StdOttFrameworkLib"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+
+    <UserControl.Resources>
+        <base:DateTimeConverter x:Key="dateTimeCon"/>
+
+        <con:TruthyConverter x:Key="truhy"/>
+    </UserControl.Resources>
+
+    <Grid Name="gidMain" DataContext="{x:Null}" >
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <ListBox x:Name="lbxItems" ItemsSource="{Binding BackupItems}">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Grid Margin="0,2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" MinWidth="200"/>
+                            <ColumnDefinition Width="*" MinWidth="500"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBox VerticalAlignment="Center" Margin="5"
+                                 Text="{Binding Name,Mode=TwoWay,UpdateSourceTrigger=LostFocus}"/>
+                        <ff:FolderPicker Grid.Column="1" VerticalAlignment="Center" IsRefreshButtonVisible="false"
+                                         AutoRefreshSelection="ForceFalse"
+                                         Folder="{Binding Folder,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}"/>
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <ToggleButton Grid.Column="0" Grid.Row="0" Name="btnChangeTimes" 
+                          Content="Change times" Width="100" Margin="5" 
+                          Checked="BtnChangeTimes_Checked" Unchecked="BtnChangeTimes_Unchecked"/>
+
+            <CheckBox Grid.Column="1" Margin="5,2" Content="Next Backup:" VerticalAlignment="Center"
+                      IsChecked="{Binding IsBackupEnabled,Mode=TwoWay}"/>
+            <TextBlock Grid.Column="2" Margin="0,2" VerticalAlignment="Center"
+                       Text="{Binding NextScheduledBackup, Converter={StaticResource dateTimeCon}}"/>
+
+            <Button Grid.Column="4" Grid.Row="0" Content="Add" HorizontalAlignment="Left" 
+                    Margin="5" Width="100" Click="BtnAdd_Click"/>
+            <Button Grid.Column="5" Grid.Row="0" Content="Remove" HorizontalAlignment="Left" 
+                    Margin="5" Width="100" DataContext="{Binding ElementName=lbxItems,Path=SelectedItem}"
+                    IsEnabled="{Binding Converter={StaticResource truhy}}"
+                    Click="BtnRemove_Click"/>
+        </Grid>
+
+        <local:BackupTimesControl Grid.Row="2" x:Name="btcChange" Visibility="Collapsed" Margin="5"
+                                  Apply="BtcChange_Apply" Cancel="BtcChange_Cancel"/>
+    </Grid>
+</UserControl>

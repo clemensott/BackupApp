@@ -1,0 +1,54 @@
+﻿<UserControl x:Class="BackupApp.Backup.Handling.BackupHandlingControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:BackupApp"
+             xmlns:con="clr-namespace:StdOttFramework.Converters;assembly=StdOttFrameworkLib"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+
+    <UserControl.Resources>
+        <local:ProgressTextConverter x:Key="progressCon"/>
+        <con:FalsyConverter x:Key="invCon"/>
+        <con:VisibleHiddenConverter x:Key="visCon"/>
+    </UserControl.Resources>
+
+    <Grid Name="gidMain" DataContext="{x:Null}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ListBox Margin="5" ItemsSource="{Binding Items}"
+                 IsEnabled="{Binding IsMoving,Converter={StaticResource invCon}}">
+            <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                </Style>
+            </ListBox.ItemContainerStyle>
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" MinWidth="160"/>
+                            <ColumnDefinition Width="100"/>
+                        </Grid.ColumnDefinitions>
+
+                        <TextBlock Grid.Column="0" Text="{Binding Name}" Margin="0,0,10,0"/>
+
+                        <Grid Grid.Column="1">
+                            <ProgressBar Maximum="1" Value="{Binding Progress,Mode=OneWay}"/>
+                            <TextBlock HorizontalAlignment="Center" Text="{Binding Progress,Mode=OneWay,
+                                         Converter={StaticResource progressCon}}"/>
+                        </Grid>
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <Button Grid.Row="1" Content="Cancel" Width="100" Margin="5,0,5,5" HorizontalAlignment="Right"
+                IsEnabled="{Binding CancelToken.IsCanceled,Converter={StaticResource invCon}}"
+                Click="BtnCloseCancel_Click"/>
+    </Grid>
+</UserControl>
