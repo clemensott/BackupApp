@@ -15,17 +15,19 @@ namespace BackupApp.Backup.Handling
             fileNames = hashes.Values.ToDictionary(v => Path.GetFileNameWithoutExtension(v));
         }
 
-        public void Add(string hash, string backupFileName)
+        public bool Add(string hash, string extension, out string backupFileName)
         {
-            hashes.Add(hash, backupFileName);
+            lock (hashes)
+            {
+                if (hashes.TryGetValue(hash, out backupFileName)) return false;
+
+                backupFileName = GetRandomFileName(extension);
+                hashes.Add(hash, backupFileName);
+                return true;
+            }
         }
 
-        public bool TryGetBackupFileName(string hash, out string backupFileName)
-        {
-            return hashes.TryGetValue(hash, out backupFileName);
-        }
-
-        public string GetRandomFileName(string extension)
+        private string GetRandomFileName(string extension)
         {
             string name;
             do

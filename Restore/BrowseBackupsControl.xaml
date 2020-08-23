@@ -7,7 +7,8 @@
              xmlns:base="clr-namespace:BackupApp"
              xmlns:con="clr-namespace:StdOttFramework.Converters;assembly=StdOttFrameworkLib"
              mc:Ignorable="d" 
-             d:DesignHeight="450" d:DesignWidth="800">
+             d:DesignHeight="450" d:DesignWidth="800"
+             x:Name="control">
 
     <UserControl.Resources>
         <base:FolderFileIconConverter x:Key="iconCon"/>
@@ -23,7 +24,7 @@
 
         <TreeView Name="tvwFolders" SelectedItemChanged="TvwFolders_SelectedItemChanged">
             <TreeView.ItemTemplate>
-                <HierarchicalDataTemplate DataType="{x:Type local:RestoreNode}" 
+                <HierarchicalDataTemplate DataType="{x:Type local:BackupFolder}" 
                                           ItemsSource="{Binding Folders}">
                     <TextBlock Text="{Binding Name}" Loaded="TbxNodeName_Loaded"/>
                 </HierarchicalDataTemplate>
@@ -49,13 +50,12 @@
 
                 <Button Grid.Column="0" Name="btnUp" Content="Up" 
                         Width="100" Margin="3" Click="BtnUp_Click"/>
-                <Button Grid.Column="2" HorizontalAlignment="Right" Margin="3" 
-                        Padding="10,0" IsEnabled="{Binding ElementName=tvwFolders,Path=SelectedItem,
-                          Converter={StaticResource isNotNullCon}}"
-                        Click="BtnRestoreTree_Click">
+                <Button Grid.Column="2" HorizontalAlignment="Right" Margin="3" Padding="10,0" 
+                        IsEnabled="{Binding ElementName=control,Path=SelectedFolder,
+                          Converter={StaticResource isNotNullCon}}" Click="BtnRestoreTree_Click">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Restore: "/>
-                        <TextBlock Text="{Binding ElementName=tvwFolders,Path=SelectedItem.Name}"/>
+                        <TextBlock Text="{Binding ElementName=control,Path=SelectedFolder.Name}"/>
                     </StackPanel>
                 </Button>
 

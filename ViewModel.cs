@@ -1,7 +1,6 @@
 ﻿using BackupApp.Backup.Config;
 using BackupApp.Backup.Handling;
 using BackupApp.Restore;
-using BackupApp.Restore.Caching;
 using BackupApp.Restore.Handling;
 using FolderFile;
 using System;
@@ -20,8 +19,6 @@ namespace BackupApp
         private BackupConfig config;
         private BackupTask backupTask;
         private RestoreTask restoreTask;
-        private CachingTask cachingTask;
-        private RestoreDb restoreDb;
 
         public bool IsHidden
         {
@@ -56,8 +53,6 @@ namespace BackupApp
 
                 backupDestFolder = value;
                 OnPropertyChanged(nameof(BackupDestFolder));
-
-                //UpdateLatestBackupDateTime();
             }
         }
 
@@ -94,30 +89,6 @@ namespace BackupApp
 
                 restoreTask = value;
                 OnPropertyChanged(nameof(RestoreTask));
-            }
-        }
-
-        public CachingTask CachingTask
-        {
-            get => cachingTask;
-            set
-            {
-                if (value == cachingTask) return;
-
-                cachingTask = value;
-                OnPropertyChanged(nameof(CachingTask));
-            }
-        }
-
-        public RestoreDb RestoreDb
-        {
-            get => restoreDb;
-            set
-            {
-                if (value == restoreDb) return;
-
-                restoreDb = value;
-                OnPropertyChanged(nameof(RestoreDb));
             }
         }
 

@@ -4,10 +4,12 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:BackupApp"
+             xmlns:con="clr-namespace:StdOttFramework.Converters;assembly=StdOttFrameworkLib"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
 
     <UserControl.Resources>
+        <con:FalsyConverter x:Key="falsy"/>
         <local:ProgressTextConverter x:Key="progressCon"/>
     </UserControl.Resources>
 
@@ -30,7 +32,8 @@
 
         <ListBox Grid.Row="2" Margin="3" ItemsSource="{Binding Errors}"/>
 
-        <Button Grid.Row="3" Content="Cancel" Margin="3"
-                Width="150" Click="BtnCancel_Click"/>
+        <Button Grid.Row="3" Content="Cancel" Margin="3" Width="150"
+                IsEnabled="{Binding CancelToken.IsCanceled,Converter={StaticResource falsy}}"
+                Click="BtnCancel_Click"/>
     </Grid>
 </UserControl>

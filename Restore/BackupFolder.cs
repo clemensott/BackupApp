@@ -1,21 +1,20 @@
 ﻿using System.ComponentModel;
+using System.Threading.Tasks;
 
 namespace BackupApp.Restore
 {
-    public enum RestoreNodeType { Backup, Folder }
-
-    public class RestoreNode : INotifyPropertyChanged
+    public class BackupFolder : INotifyPropertyChanged
     {
-        private RestoreNode[] folders;
-        private RestoreFile[] files;
+        private BackupFolder[] folders;
+        private BackupFile[] files;
 
-        public long ID { get; }
+        public long? ID { get; }
 
         public string Name { get; }
 
-        public RestoreNodeType Type { get; }
+        internal BackupReadDb DB { get; }
 
-        public RestoreNode[] Folders
+        public BackupFolder[] Folders
         {
             get => folders;
             set
@@ -27,7 +26,7 @@ namespace BackupApp.Restore
             }
         }
 
-        public RestoreFile[] Files
+        public BackupFile[] Files
         {
             get => files;
             set
@@ -39,21 +38,21 @@ namespace BackupApp.Restore
             }
         }
 
-        public RestoreNode(long id, string name, RestoreNodeType type)
+        internal BackupFolder(long? id, string name, BackupReadDb db)
         {
             ID = id;
             Name = name;
-            Type = type;
+            DB = db;
         }
 
-        public static RestoreNode CreateBackup(long id, string name)
+        public async Task LoadFolders()
         {
-            return new RestoreNode(id, name, RestoreNodeType.Backup);
+            if (Folders == null) Folders = (await DB.GetFolders(ID))?.ToArray();
         }
 
-        public static RestoreNode CreateFolder(long id, string name)
+        public async Task LoadFiles()
         {
-            return new RestoreNode(id, name, RestoreNodeType.Folder);
+            if (Files == null) Files = (await DB.GetFiles(ID))?.ToArray();
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

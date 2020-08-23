@@ -2,29 +2,34 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using BackupApp.Backup.Result;
+using BackupApp.Restore;
+using StdOttStandard.Linq;
+using StdOttStandard.Linq.DataStructures;
 
 namespace BackupApp.Helper
 {
-    public static class BackupUtils
+    static class BackupUtils
     {
-        private const int folderDepthChars = 3;
-        private const string txtExtension = ".txt", backupFilesDirName = "files";
+        private const string dbExtension = ".db", backupFilesDirName = "files";
 
         public static string GetBackupedFilesFolderPath(string baseFolderPath)
         {
             return Path.Combine(baseFolderPath, backupFilesDirName);
         }
 
-        public static bool TryDecodeFolder(string line, out int depth, out string folderName)
+        public async static Task<IDictionary<string, string>> GetAllFiles(string folderPath)
         {
-            depth = -1;
-            folderName = null;
+            IDictionary<string, string> files = new Dictionary<string, string>();
+            await Task.WhenAll(GetReadDBs(folderPath).ToNotNull().Select(db => db.GetAllFiles(files)));
 
-            if (line.Length <= 3) return false;
+            return files;
+        }
 
-            folderName = line.Substring(folderDepthChars);
-            return int.TryParse(line.Remove(folderDepthChars), out depth);
+        public static IEnumerable<BackupReadDb> GetReadDBs(string folderPath)
+        {
+            return GetBackupResultFiles(folderPath)?.Select(f => new BackupReadDb(f));
         }
 
         public static IEnumerable<string> GetBackupResultFiles(string folderPath)
@@ -32,7 +37,7 @@ namespace BackupApp.Helper
             try
             {
                 return Directory.GetFiles(folderPath)
-                    .Where(f => f.EndsWith(txtExtension) &&
+                    .Where(f => f.EndsWith(dbExtension) &&
                                 TryConvertToDateTime(Path.GetFileNameWithoutExtension(f), out _));
             }
             catch
@@ -62,130 +67,20 @@ namespace BackupApp.Helper
             return true;
         }
 
-        public static int GetFilesCount(IBackupNode node)
+        public static Task<BackupWriteDb> CreateDb(string folderPath, DateTime timestamp)
         {
-            int count = 0;
-            Queue<IBackupNode> nodes = new Queue<IBackupNode>();
+            string name = ConvertDateTimeOfBackupToString(timestamp);
+            string backupPath = Path.Combine(folderPath, name + dbExtension);
 
-            nodes.Enqueue(node);
-
-            while (nodes.Count > 0)
-            {
-                node = nodes.Dequeue();
-
-                foreach (IBackupNode folder in node.Folders)
-                {
-                    nodes.Enqueue(folder);
-                }
-
-                count += node.Files?.Count ?? 0;
-            }
-
-            return count;
+            return BackupWriteDb.Create(backupPath);
         }
 
-        public static void SaveBackup(string folderPath, BackupModel backup)
+        private static string ConvertDateTimeOfBackupToString(DateTime dateTimeOfBackup)
         {
-            string backupPath = Path.Combine(folderPath, backup.Name + txtExtension);
+            DateTime dt = dateTimeOfBackup;
 
-            try
-            {
-                var backupLines = SerializeLines(backup);
-                File.WriteAllLines(backupPath, backupLines);
-            }
-            catch (Exception e)
-            {
-                try
-                {
-                    File.Delete(backupPath);
-                }
-                catch (Exception e1)
-                {
-                    DebugEvent.SaveText("HandleBackupMoveDeleteBackupException", e1.ToString());
-                }
-
-                throw e;
-            }
+            return string.Format("{0:0000}-{1:00}-{2:00}_{3:00}-{4:00}-{5:00}",
+                dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, dt.Second);
         }
-
-        private static IEnumerable<string> SerializeLines(BackupModel backup)
-        {
-            yield return backup.Timestamp.Ticks.ToString();
-
-            foreach (string line in SerializeNode(backup, 0))
-            {
-                yield return line;
-            }
-        }
-
-        private static IEnumerable<string> SerializeNode(IBackupNode node, int depth)
-        {
-            yield return depth.ToString().PadLeft(folderDepthChars) + node.Name;
-
-            foreach (BackupFile file in node.Files)
-            {
-                yield return string.Format(">{0}|{1}|{2}", file.Base64Hash, file.SourcePath, file.Name);
-            }
-
-            foreach (BackupFolder folder in node.Folders)
-            {
-                foreach (string line in SerializeNode(folder, depth + 1))
-                {
-                    yield return line;
-                }
-            }
-        }
-
-        //public static async Task<BackupModel> Deserialize(StreamReader reader)
-        //{
-        //    StreamReaderEnumerator enumerator = new StreamReaderEnumerator(reader);
-        //    string ticksText = await enumerator.ReadLineAsync();
-        //    DateTime timestamp = new DateTime(long.Parse(ticksText));
-
-        //    string name = await enumerator.ReadLineAsync();
-
-        //    await enumerator.MoveNextAsync();
-        //    List<BackupFolder> folders = await DeserializeFolders(enumerator, 1);
-
-        //    return new BackupModel(timestamp, folders);
-        //}
-
-        //private static async Task<List<BackupFolder>> DeserializeFolders(StreamReaderEnumerator enumerator, int depth)
-        //{
-        //    int lineDepth;
-        //    List<BackupFolder> folders = new List<BackupFolder>();
-
-        //    while (!enumerator.EndOfStream && int.TryParse(enumerator.Current.Remove(FolderDepthChars), out lineDepth) && lineDepth == depth)
-        //    {
-        //        string folderName = enumerator.Current.Substring(FolderDepthChars);
-        //        List<BackupFile> files = await DeserializeFiles(enumerator);
-        //        List<BackupFolder> subFolders = await DeserializeFolders(enumerator, depth + 1);
-
-        //        folders.Add(new BackupFolder(folderName, subFolders, files));
-        //    }
-
-        //    return folders;
-        //}
-
-        //private static async Task<List<BackupFile>> DeserializeFiles(StreamReaderEnumerator enumerator)
-        //{
-        //    List<BackupFile> files = new List<BackupFile>();
-
-        //    while (await enumerator.MoveNextAsync())
-        //    {
-        //        if (enumerator.Current[0] != '>') break;
-
-        //        string line = enumerator.Current.Substring(1);
-        //        string[] parts = line.Split('|');
-
-        //        string hash = parts[0];
-        //        string sourcePath = parts[1];
-        //        string fileName = parts[2];
-
-        //        files.Add(new BackupFile(fileName, sourcePath, hash));
-        //    }
-
-        //    return files;
-        //}
     }
 }

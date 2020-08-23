@@ -1,7 +1,6 @@
 ﻿using BackupApp.Backup.Config;
 using BackupApp.Backup.Result;
 using BackupApp.Helper;
-using FolderFile;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -13,11 +12,9 @@ namespace BackupApp.Backup.Handling
 {
     public class BackupTask : INotifyPropertyChanged
     {
-        private bool isMoving, failed, isBackuping;
+        private bool failed, isBackuping, isLoadingBackupedFiles, isFlushing;
         private Exception failedException;
-        private Task<BackupModel> task;
         private DateTime started;
-        private readonly BackupedFiles backupedFiles;
 
         public bool IsBackuping
         {
@@ -31,15 +28,27 @@ namespace BackupApp.Backup.Handling
             }
         }
 
-        public bool IsMoving
+        public bool IsFlushing
         {
-            get { return isMoving; }
+            get { return isFlushing; }
             private set
             {
-                if (value == isMoving) return;
+                if (value == isFlushing) return;
 
-                isMoving = value;
-                OnPropertyChanged(nameof(IsMoving));
+                isFlushing = value;
+                OnPropertyChanged(nameof(IsFlushing));
+            }
+        }
+
+        public bool IsLoadingBackupedFiles
+        {
+            get => isLoadingBackupedFiles;
+            private set
+            {
+                if (value == isLoadingBackupedFiles) return;
+
+                isLoadingBackupedFiles = value;
+                OnPropertyChanged(nameof(IsLoadingBackupedFiles));
             }
         }
 
@@ -67,23 +76,13 @@ namespace BackupApp.Backup.Handling
             }
         }
 
-        public Folder DestFolder { get; }
+        public string DestFolderPath { get; }
 
         public TaskBackupItem[] Items { get; }
 
         public CancelToken CancelToken { get; }
 
-        public Task<BackupModel> Task
-        {
-            get { return task; }
-            private set
-            {
-                if (value == task) return;
-
-                task = value;
-                OnPropertyChanged(nameof(Task));
-            }
-        }
+        public Task Task { get; private set; }
 
         public DateTime Started
         {
@@ -97,120 +96,108 @@ namespace BackupApp.Backup.Handling
             }
         }
 
-        private BackupTask(Folder backupFolder, IEnumerable<BackupItem> backupItems, BackupedFiles backupedFiles)
+        private BackupTask(string backupFolderPath, IEnumerable<BackupItem> backupItems)
         {
             CancelToken = new CancelToken();
-            DestFolder = backupFolder?.Clone();
-            Items = backupItems.Select(ToTaskItem).ToArray();
-            this.backupedFiles = backupedFiles;
+            DestFolderPath = backupFolderPath;
+            Items = backupItems.Select(item => ToTaskItem(item, CancelToken)).ToArray();
         }
 
-        public static BackupTask Run(Folder backupFolder, IEnumerable<BackupItem> backupItems, BackupedFiles backupedFiles)
+        public static BackupTask Run(string backupFolderPath, IEnumerable<BackupItem> backupItems)
         {
-            BackupTask task = new BackupTask(backupFolder, backupItems, backupedFiles);
+            BackupTask task = new BackupTask(backupFolderPath, backupItems);
             task.Started = DateTime.Now;
             task.Task = task.Run();
 
             return task;
         }
 
-        private static TaskBackupItem ToTaskItem(BackupItem item)
+        private static TaskBackupItem ToTaskItem(BackupItem item, CancelToken cancelToken)
         {
-            return new TaskBackupItem(item.Name, item.Folder.Clone());
+            return new TaskBackupItem(item.Name, item.Folder.Clone(), cancelToken);
         }
 
-        private async Task<BackupModel> Run()
+        private async Task Run()
         {
             DebugEvent.SaveText("Backup");
 
-            if (DestFolder == null || !Directory.Exists(DestFolder.FullName) || Items == null || Items.Length == 0) return null;
+            if (!Directory.Exists(DestFolderPath) || Items == null || Items.Length == 0) return;
 
             IsBackuping = true;
-
-            //foreach(var item in Items)
-            //{
-            //    for (int i = 0; i < 100; i++)
-            //    {
-            //        item.Progress = i / 100.0;
-            //        await System.Threading.Tasks.Task.Delay(100);
-            //    }
-            //}
-            //BackupModel backup = null;
-
-            BackupModel backup = await Backup();
+            await Backup();
             IsBackuping = false;
-
-            return backup;
         }
 
-        private async Task<BackupModel> Backup()
+        private async Task Backup()
         {
+            string destDbPath = null;
+            List<string> addedFiles = new List<string>();
+            BackupWriteDb db = null;
             DebugEvent.SaveText("HandleBackup");
 
             try
             {
-                List<string> addedFiles = new List<string>();
-                string filesBackupDir = BackupUtils.GetBackupedFilesFolderPath(DestFolder.FullName);
-                BackupModel backup = await CreateBackup(filesBackupDir);
-
-                if (backup == null) return null;
-
-                IsMoving = true;
-
-                BackupUtils.SaveBackup(DestFolder.FullName, backup);
-
-                DebugEvent.SaveText("HandleBackupSuccessful");
-                IsMoving = false;
-                Failed = false;
-
-                return backup;
-            }
-            catch (Exception e)
-            {
-                IsMoving = false;
-                Failed = true;
-                FailedException = e;
-
-                return null;
-            }
-        }
-
-        private async Task<BackupModel> CreateBackup(string backupFilesDir)
-        {
-            DebugEvent.SaveText("CreateBackup", "Path: " + backupFilesDir);
-
-            BackupFolder[] folders;
-            DateTime timestamp = DateTime.Now;
-            List<string> addedFiles = new List<string>();
-
-            try
-            {
+                IsLoadingBackupedFiles = true;
+                Task<IDictionary<string, string>> allFilesTask = Task.Run(() => BackupUtils.GetAllFiles(DestFolderPath));
                 Dictionary<Task, TaskBackupItem> dict = Items.ToDictionary(i => i.BeginBackup());
+                db = await BackupUtils.CreateDb(Path.GetTempPath(), Started);
+                //db = await BackupUtils.CreateDb(@"C:\Sharp", Started);
 
-                if (!Directory.Exists(backupFilesDir)) Directory.CreateDirectory(backupFilesDir);
+                IDictionary<string, string> allFiles = await allFilesTask;
+                BackupedFiles backupedFiles = new BackupedFiles(allFiles);
+                IsLoadingBackupedFiles = false;
 
-                folders = await System.Threading.Tasks.Task.Run(async () =>
+                string filesBackupDir = BackupUtils.GetBackupedFilesFolderPath(DestFolderPath);
+                if (!Directory.Exists(filesBackupDir)) Directory.CreateDirectory(filesBackupDir);
+
+                while (!CancelToken.IsCanceled && dict.Count > 0)
                 {
-                    int i = 0;
-                    BackupFolder[] backupFolders = new BackupFolder[dict.Count];
+                    Task filesLoadedTask = await Task.WhenAny(dict.Keys);
 
-                    while (!CancelToken.IsCanceled && dict.Count > 0)
+                    if (CancelToken.IsCanceled) break;
+
+                    await Task.Run(() => dict[filesLoadedTask].Backup(filesBackupDir, db, backupedFiles, addedFiles));
+                    dict.Remove(filesLoadedTask);
+                }
+
+                db.Finish();
+
+                if (addedFiles.Count == 0 || CancelToken.IsCanceled)
+                {
+                    db.Dispose();
+                    await db.FlushTask;
+
+                    File.Delete(db.Path);
+
+                    foreach (string addedFile in addedFiles)
                     {
-                        Task filesLoadedTask = await System.Threading.Tasks.Task.WhenAny(dict.Keys);
-
-                        if (CancelToken.IsCanceled) break;
-
-                        backupFolders[i++] = dict[filesLoadedTask].Backup(backupFilesDir, backupedFiles, CancelToken, addedFiles);
-
-                        dict.Remove(filesLoadedTask);
+                        try
+                        {
+                            File.Delete(addedFile);
+                        }
+                        catch (Exception e)
+                        {
+                            DebugEvent.SaveText("CancelBackupDeleteAddedFileException", e.ToString());
+                        }
                     }
 
-                    return backupFolders;
-                });
+                    return;
+                }
+
+                IsFlushing = true;
+
+                destDbPath = Path.Combine(DestFolderPath, Path.GetFileName(db.Path));
+                await db.FlushTask;
+                File.Move(db.Path, destDbPath);
+
+                DebugEvent.SaveText("HandleBackupSuccessful");
+                Failed = false;
             }
             catch (Exception e)
             {
-                DebugEvent.SaveText("CreateBackupItselfException", e.ToString());
+                DebugEvent.SaveText("CreateBackupException", e.ToString());
+                CancelToken.Cancel();
+                db?.Dispose();
 
                 foreach (string addedFile in addedFiles)
                 {
@@ -220,14 +207,36 @@ namespace BackupApp.Backup.Handling
                     }
                     catch (Exception e2)
                     {
-                        DebugEvent.SaveText("CreateBackupDeleteException", e2.ToString());
+                        DebugEvent.SaveText("CreateBackupDeleteAddedFileException", e2.ToString());
                     }
                 }
 
-                throw;
-            }
+                try
+                {
+                    // if (db != null) File.Delete(db.Path);
+                }
+                catch (Exception e2)
+                {
+                    DebugEvent.SaveText("CreateBackupDeleteLocalDbException", e2.ToString());
+                }
 
-            return addedFiles.Count > 0 && !CancelToken.IsCanceled ? new BackupModel(timestamp, folders) : null;
+                try
+                {
+                    if (destDbPath != null && File.Exists(destDbPath)) File.Delete(destDbPath);
+                }
+                catch (Exception e2)
+                {
+                    DebugEvent.SaveText("CreateBackupDeleteDestDbException", e2.ToString());
+                }
+
+                Failed = true;
+                FailedException = e;
+            }
+            finally
+            {
+                IsLoadingBackupedFiles = false;
+                IsFlushing = false;
+            }
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

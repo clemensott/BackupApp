@@ -102,14 +102,21 @@
       <DependentUpon>BackupTimesControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="Backup\Config\BackupConfig.cs" />
+    <Compile Include="Restore\BackupFile.cs" />
+    <Compile Include="Restore\BackupFolder.cs" />
+    <Compile Include="Restore\BackupReadDb.cs" />
+    <Compile Include="Backup\Result\BackupWriteDb.cs" />
+    <Compile Include="Backup\Result\DbFile.cs" />
+    <Compile Include="Backup\Result\DbFolder.cs" />
+    <Compile Include="Backup\Result\DbFolderFile.cs" />
+    <Compile Include="Backup\Result\SqlStatementBuilder.cs" />
     <Compile Include="CancelToken.cs" />
     <Compile Include="Backup\Config\BackupItem.cs" />
     <Compile Include="Backup\Handling\BackupTask.cs" />
-    <Compile Include="Backup\Result\BackupModel.cs" />
-    <Compile Include="Backup\Result\BackupFile.cs" />
-    <Compile Include="Backup\Result\BackupFolder.cs" />
+    <Compile Include="Backup\Handling\BackupFile.cs" />
+    <Compile Include="Backup\Handling\BackupFolder.cs" />
     <Compile Include="Helper\BackupUtils.cs" />
-    <Compile Include="Backup\Result\IBackupNode.cs" />
+    <Compile Include="Helper\DbHelper.cs" />
     <Compile Include="Helper\StreamReaderEnumerator.cs" />
     <Compile Include="LocalSave\LoadSaveHandler.cs" />
     <Compile Include="Restore\BrowseBackupsControl.xaml.cs">
@@ -124,20 +131,10 @@
     <Compile Include="Backup\Config\OffsetInterval.cs" />
     <Compile Include="Converter\ProgressTextConverter.cs" />
     <Compile Include="Backup\Handling\BackupedFiles.cs" />
-    <Compile Include="Restore\Caching\BackupsCachingTask.cs" />
-    <Compile Include="Restore\Caching\CachingRestoreDbControl.xaml.cs">
-      <DependentUpon>CachingRestoreDbControl.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="Restore\Caching\CachingTask.cs" />
-    <Compile Include="Restore\Caching\FolderCachingTask.cs" />
-    <Compile Include="Restore\Caching\RestoreDb.cs" />
     <Compile Include="Restore\Handling\RestoreBackupControl.xaml.cs">
       <DependentUpon>RestoreBackupControl.xaml</DependentUpon>
     </Compile>
-    <Compile Include="Restore\RestoreFile.cs" />
-    <Compile Include="Restore\RestoreNode.cs" />
     <Compile Include="Restore\Handling\RestoreTask.cs" />
-    <Compile Include="Restore\RestoreUtils.cs" />
     <Compile Include="LocalSave\Settings.cs" />
     <Compile Include="Backup\Handling\TaskBackupItem.cs" />
     <Compile Include="ViewModel.cs" />
@@ -170,10 +167,6 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
-    <Page Include="Restore\Caching\CachingRestoreDbControl.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
     <Page Include="Restore\Handling\RestoreBackupControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>

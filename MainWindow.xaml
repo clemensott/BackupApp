@@ -7,7 +7,6 @@
         xmlns:config="clr-namespace:BackupApp.Backup.Config"
         xmlns:bakHandle="clr-namespace:BackupApp.Backup.Handling"
         xmlns:restore="clr-namespace:BackupApp.Restore"
-        xmlns:cache="clr-namespace:BackupApp.Restore.Caching"
         xmlns:reHandle="clr-namespace:BackupApp.Restore.Handling"
         xmlns:ff="clr-namespace:FolderFile;assembly=FolderFileLib"
         xmlns:con="clr-namespace:StdOttFramework.Converters;assembly=StdOttFrameworkLib"
@@ -55,7 +54,7 @@
             </TabItem>
             <TabItem Header="Restore">
                 <Grid>
-                    <restore:BrowseBackupsControl x:Name="bbc" DB="{Binding RestoreDb}"
+                    <restore:BrowseBackupsControl x:Name="bbc" SrcFolderPath="{Binding BackupDestFolder.FullName}"
                                                   Visibility="{Binding RestoreTask.IsRestoring,
                                                     Converter={StaticResource isNotTrueCon},
                                                     FallbackValue={StaticResource visible}}"
@@ -66,10 +65,6 @@
                                                      Converter={StaticResource isTrueCon},
                                                      FallbackValue={StaticResource collapsed}}"/>
                 </Grid>
-            </TabItem>
-            <TabItem Header="Caching" Visibility="{Binding CachingTask.Task.IsCompleted,
-                       Converter={StaticResource isNotTrueCon},FallbackValue={StaticResource collapsed}}">
-                <cache:CachingRestoreDbControl Task="{Binding CachingTask}"/>
             </TabItem>
         </TabControl>
     </Grid>

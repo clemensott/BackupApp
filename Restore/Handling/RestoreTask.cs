@@ -4,9 +4,9 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
-using System.Threading;
 using System.Threading.Tasks;
 using StdOttStandard.Linq;
+using StdOttStandard.Linq.DataStructures;
 
 namespace BackupApp.Restore.Handling
 {
@@ -15,16 +15,15 @@ namespace BackupApp.Restore.Handling
         private bool isRestoring;
         private int totalCount, currentCount;
         private double progress;
-        private readonly Queue<string> errorQueue;
-        private readonly SemaphoreSlim errorsSem;
+        private readonly AsyncQueue<string> errorQueue;
 
         public string DestFolder { get; }
 
-        public RestoreNode Node { get; }
+        public BackupFolder Node { get; }
 
         public CancelToken CancelToken { get; }
 
-        public Task Task { get; }
+        public Task Task { get; private set; }
 
         public ObservableCollection<string> Errors { get; }
 
@@ -54,49 +53,84 @@ namespace BackupApp.Restore.Handling
 
         public string CurrentFile { get; private set; }
 
-        private RestoreTask(string destFolder, RestoreNode node, CancelToken cancelToken)
+        private RestoreTask(string destFolder, BackupFolder node, CancelToken cancelToken)
         {
-            errorQueue = new Queue<string>();
-            errorsSem = new SemaphoreSlim(0);
+            errorQueue = new AsyncQueue<string>();
             DestFolder = destFolder;
             Node = node;
             CancelToken = cancelToken ?? new CancelToken();
             Errors = new ObservableCollection<string>();
-            IsRestoring = true;
-            Task = Task.Run(new Action(Restore));
-
-            UpdateCurrentFile();
-            AddErrorHandler();
         }
 
-        private async void UpdateCurrentFile()
+        private async Task UpdateCurrentFile()
         {
-            string lastCurrentFile = CurrentFile;
+            string lastCurrentFile = null;
 
             while (IsRestoring)
             {
                 await Task.Delay(200);
 
-                if (lastCurrentFile != CurrentFile) OnPropertyChanged(nameof(CurrentFile));
+                if (lastCurrentFile == CurrentFile) continue;
+
+                lastCurrentFile = CurrentFile;
+                OnPropertyChanged(nameof(CurrentFile));
             }
         }
 
-        public static RestoreTask Run(string destFolder, RestoreNode node, CancelToken cancelToken = null)
+        public static RestoreTask Run(string destFolder, BackupFolder node, CancelToken cancelToken = null)
         {
-            return new RestoreTask(destFolder, node, cancelToken);
+            RestoreTask task = new RestoreTask(destFolder, node, cancelToken);
+            task.Task = Task.Run(task.Run);
+
+            return task;
         }
 
-        private void Restore()
+        private Task Run()
         {
-            string srcDirPath = BackupUtils.GetBackupedFilesFolderPath(DestFolder);
-
-            totalCount = RestoreUtils.GetFilesCount(Node);
-            Restore(Node, DestFolder, srcDirPath);
-
-            IsRestoring = false;
+            return Task.WhenAll(Task.Run(Restore), AddErrorHandler(), UpdateCurrentFile());
         }
 
-        private void Restore(RestoreNode node, string currentPath, string srcDirPath)
+        private async Task Restore()
+        {
+            try
+            {
+                IsRestoring = true;
+                string srcDirPath = BackupUtils.GetBackupedFilesFolderPath(DestFolder);
+
+                CurrentFile = "Load folder structure";
+                await LoadAllFiles(Node);
+                if (CancelToken.IsCanceled) return;
+
+                totalCount = GetFilesCount(Node);
+                await Restore(Node, DestFolder, srcDirPath);
+            }
+            finally
+            {
+                IsRestoring = false;
+            }
+        }
+
+        private async Task LoadAllFiles(BackupFolder node)
+        {
+            Queue<BackupFolder> nodes = new Queue<BackupFolder>();
+            nodes.Enqueue(node);
+
+            while (nodes.Count > 0)
+            {
+                if (CancelToken.IsCanceled) return;
+                node = nodes.Dequeue();
+
+                await node.LoadFolders();
+                await node.LoadFiles();
+
+                foreach (BackupFolder folder in node.Folders.ToNotNull())
+                {
+                    nodes.Enqueue(folder);
+                }
+            }
+        }
+
+        private async Task Restore(BackupFolder node, string currentPath, string srcDirPath)
         {
             currentPath = Path.Combine(currentPath, node.Name);
 
@@ -108,13 +142,13 @@ namespace BackupApp.Restore.Handling
                 }
                 catch (Exception e)
                 {
-                    AddError("Create directory: " + currentPath + "\r\n" + e);
-                    IncreaseCurrentCount(RestoreUtils.GetFilesCount(node));
+                    await errorQueue.Enqueue("Create directory: " + currentPath + "\r\n" + e);
+                    IncreaseCurrentCount(GetFilesCount(node));
                     return;
                 }
             }
 
-            foreach (RestoreFile file in node.Files.ToNotNull())
+            foreach (BackupFile file in node.Files.ToNotNull())
             {
                 if (CancelToken.IsCanceled) return;
 
@@ -131,17 +165,17 @@ namespace BackupApp.Restore.Handling
                 }
                 catch (Exception e)
                 {
-                    AddError(destFilePath + "\r\n" + e);
+                    await errorQueue.Enqueue(destFilePath + "\r\n" + e);
                 }
 
                 IncreaseCurrentCount();
             }
 
-            foreach (RestoreNode subFolder in node.Folders)
+            foreach (BackupFolder subFolder in node.Folders)
             {
                 if (CancelToken.IsCanceled) return;
 
-                Restore(subFolder, currentPath, srcDirPath);
+                await Restore(subFolder, currentPath, srcDirPath);
             }
         }
 
@@ -151,19 +185,36 @@ namespace BackupApp.Restore.Handling
             Progress = Math.Round(currentCount / (double)totalCount, 2);
         }
 
-        private void AddError(string error)
+        private static int GetFilesCount(BackupFolder node)
         {
-            errorQueue.Enqueue(error);
-            errorsSem.Release();
+            int count = 0;
+            Queue<BackupFolder> nodes = new Queue<BackupFolder>();
+            nodes.Enqueue(node);
+
+            while (nodes.Count > 0)
+            {
+                node = nodes.Dequeue();
+
+                foreach (BackupFolder folder in node.Folders)
+                {
+                    nodes.Enqueue(folder);
+                }
+
+                count += node.Files?.Length ?? 0;
+            }
+
+            return count;
         }
 
-        private async void AddErrorHandler()
+        private async Task AddErrorHandler()
         {
-            while (IsRestoring)
+            while (true)
             {
-                await errorsSem.WaitAsync();
+                (bool isEnd, string item) = await errorQueue.Dequeue();
 
-                Errors.Insert(0, errorQueue.Dequeue());
+                if (isEnd) return;
+
+                Errors.Insert(0, item);
             }
         }
 

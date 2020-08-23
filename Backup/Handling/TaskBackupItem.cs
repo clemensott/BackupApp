@@ -46,106 +46,92 @@ namespace BackupApp.Backup.Handling
 
         public Folder Folder { get; }
 
-        public TaskBackupItem(string name, Folder folder)
+        public CancelToken CancelToken { get; }
+
+        public TaskBackupItem(string name, Folder folder, CancelToken cancelToken)
         {
             Name = name;
             Folder = folder;
+            CancelToken = cancelToken;
         }
 
         public Task BeginBackup()
         {
             return Task.Run(() =>
             {
-                baseFolder = BackupFolder.FromPath(Folder);
+                baseFolder = BackupFolder.FromPath(Folder, Name);
                 totalCount = GenerateUtils.SelectRecursive(baseFolder, f => f.Folders)
-                    .SelectMany(f => f.Files).Count();
+                    .Select(f => f.Files.Length).Sum();
             });
         }
 
-        public BackupFolder Backup(string dirPath, BackupedFiles backupedFiles,
-            CancelToken cancelToken, List<string> addedFiles)
+        public void Backup(string filesDestFolderPath, BackupWriteDb db,
+            BackupedFiles backupedFiles, IList<string> addedFiles)
         {
             currentCount = 0;
 
             try
             {
-                return BackupDir(baseFolder, Name, DoBackupFiles, cancelToken);
+                Queue<BackupFolder> folderQueue = new Queue<BackupFolder>();
+                Queue<BackupFile> fileQueue = new Queue<BackupFile>();
+                folderQueue.Enqueue(baseFolder);
+
+                while (folderQueue.Count > 0)
+                {
+                    BackupFolder currentFolder = folderQueue.Dequeue();
+                    long folderId = db.AddFolder(currentFolder.Name, currentFolder.ParentId);
+
+                    foreach (BackupFolder subFolder in currentFolder.Folders)
+                    {
+                        subFolder.ParentId = folderId;
+                        folderQueue.Enqueue(subFolder);
+                    }
+
+                    foreach (BackupFile file in currentFolder.Files)
+                    {
+                        fileQueue.Enqueue(file);
+                    }
+                }
+
+                Parallel.ForEach(fileQueue,
+                    f => DoBackupFile(f.File, f.FolderId, filesDestFolderPath, db, backupedFiles, addedFiles));
             }
             finally
             {
                 Finished = true;
             }
-
-            BackupFile[] DoBackupFiles(IEnumerable<string> files)
-            {
-                return files.Select(f => new FileInfo(f))
-                    .Where(f => !cancelToken.IsCanceled)
-                    .Select(DoBackupFile).OfType<BackupFile>().ToArray();
-            }
-
-            BackupFile? DoBackupFile(FileInfo file)
-            {
-                try
-                {
-                    if (IsHidden(file)) return null;
-
-                    string backupFileName, destPath;
-                    string fileHash = GetHash(file.FullName);
-
-                    if (backupedFiles.TryGetBackupFileName(fileHash, out backupFileName))
-                    {
-                        return new BackupFile(file.Name, backupFileName, fileHash);
-                    }
-
-                    backupFileName = backupedFiles.GetRandomFileName(file.Extension);
-                    destPath = Path.Combine(dirPath, backupFileName);
-
-                    if (File.Exists(destPath))
-                    {
-                        if (fileHash != GetHash(fileHash))
-                        {
-                            File.Delete(destPath);
-                            File.Copy(file.FullName, destPath);
-                        }
-                    }
-                    else File.Copy(file.FullName, destPath);
-
-                    backupedFiles.Add(fileHash, backupFileName);
-                    addedFiles.Add(destPath);
-
-                    return new BackupFile(file.Name, backupFileName, fileHash);
-                }
-                catch
-                {
-                    return null;
-                }
-                finally
-                {
-                    currentCount++;
-
-                    Progress = totalCount > 0 ? Math.Round(currentCount / (double)totalCount, 2) : 0;
-                }
-            }
         }
 
-        private static BackupFolder BackupDir(BackupFolder folder, string dirName,
-            Func<IEnumerable<string>, BackupFile[]> doBackupFiles, CancelToken cancelToken)
+        private void DoBackupFile(FileInfo file, long folderId, string filesDestFolderPath,
+            BackupWriteDb db, BackupedFiles backupedFiles, IList<string> addedFiles)
         {
-            if (cancelToken.IsCanceled) return null;
-
-            BackupFile[] backupFiles = GetBackupFiles();
-            BackupFolder[] backupFolders = GetBackupFolders();
-
-            return new BackupFolder(dirName, backupFolders, backupFiles);
-
-            BackupFile[] GetBackupFiles()
+            try
             {
-                return doBackupFiles(folder.Files.Select(f => f.SourcePath));
+                if (CancelToken.IsCanceled || IsHidden(file) || db.Disposed) return;
+
+                string backupFileName;
+                string fileHash = GetHash(file.FullName);
+
+                if (CancelToken.IsCanceled || db.Disposed) return;
+
+                if (backupedFiles.Add(fileHash, file.Extension, out backupFileName))
+                {
+                    string destPath = Path.Combine(filesDestFolderPath, backupFileName);
+
+                    if (File.Exists(destPath)) File.Delete(destPath);
+                    File.Copy(file.FullName, destPath);
+
+                    addedFiles.Add(destPath);
+                }
+
+                db.AddFile(file.Name, fileHash, backupFileName, folderId);
             }
-
-            BackupFolder[] GetBackupFolders()
+            catch { }
+            finally
             {
-                return folder.Folders.Select(f => BackupDir(f, f.Name, doBackupFiles, cancelToken)).ToArray();
+                currentCount++;
+
+                Progress = totalCount > 0 ? Math.Round(currentCount / (double)totalCount, 2) : 0;
             }
         }
 
