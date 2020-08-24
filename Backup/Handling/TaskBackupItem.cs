@@ -151,13 +151,13 @@ namespace BackupApp.Backup.Handling
         {
             try
             {
-                if (CancelToken.IsCanceled || DB.Disposed ||
+                if (CancelToken.IsCanceled ||
                     IsHidden(file) || ExcludePath(file.FullName)) return;
 
                 string backupFileName;
                 string fileHash = GetHash(file.FullName);
 
-                if (CancelToken.IsCanceled || DB.Disposed) return;
+                if (CancelToken.IsCanceled) return;
 
                 if (backupedFiles.Add(fileHash, file.Extension, out backupFileName))
                 {

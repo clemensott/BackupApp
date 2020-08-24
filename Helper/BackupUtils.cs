@@ -66,12 +66,12 @@ namespace BackupApp.Helper
             return true;
         }
 
-        public static Task<BackupWriteDb> CreateDb(string folderPath, DateTime timestamp)
+        public static BackupWriteDb CreateDb(string folderPath, DateTime timestamp)
         {
             string name = ConvertDateTimeOfBackupToString(timestamp);
             string backupPath = Path.Combine(folderPath, name + dbExtension);
 
-            return BackupWriteDb.Create(backupPath);
+            return new BackupWriteDb(backupPath);
         }
 
         private static string ConvertDateTimeOfBackupToString(DateTime dateTimeOfBackup)

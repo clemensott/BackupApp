@@ -108,9 +108,16 @@ namespace BackupApp
         {
             lock (lockObj)
             {
-                using (StreamWriter writer = File.AppendText(debugEventsFileName))
+                try
                 {
-                    writer.Write(text);
+                    using (StreamWriter writer = File.AppendText(debugEventsFileName))
+                    {
+                        writer.Write(text);
+                    }
+                }
+                catch (Exception e)
+                {
+                    System.Diagnostics.Debug.WriteLine("Save text error: " + e.Message);
                 }
             }
         }

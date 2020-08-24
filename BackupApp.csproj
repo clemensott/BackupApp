@@ -102,6 +102,7 @@
       <DependentUpon>BackupTimesControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="Backup\Config\BackupConfig.cs" />
+    <Compile Include="Backup\Handling\PathPattern.cs" />
     <Compile Include="Restore\BackupFile.cs" />
     <Compile Include="Restore\BackupFolder.cs" />
     <Compile Include="Restore\BackupReadDb.cs" />
@@ -109,7 +110,6 @@
     <Compile Include="Backup\Result\DbFile.cs" />
     <Compile Include="Backup\Result\DbFolder.cs" />
     <Compile Include="Backup\Result\DbFolderFile.cs" />
-    <Compile Include="Backup\Result\SqlStatementBuilder.cs" />
     <Compile Include="CancelToken.cs" />
     <Compile Include="Backup\Config\BackupItem.cs" />
     <Compile Include="Backup\Handling\BackupTask.cs" />

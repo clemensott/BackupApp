@@ -135,8 +135,12 @@ namespace BackupApp.Restore
             SQLiteConnection connection = await GetConnection(Path);
             try
             {
+                if (cancelToken?.IsCanceled == true) return;
+
                 using (DbDataReader reader = await connection.ExecuteReaderAsync(sql))
                 {
+                    if (cancelToken?.IsCanceled == true) return;
+
                     int hashIndex = reader.GetOrdinal("hash");
                     int fileNameIndex = reader.GetOrdinal("file_name");
 

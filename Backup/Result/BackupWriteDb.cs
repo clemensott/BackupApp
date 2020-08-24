@@ -1,95 +1,49 @@
 ﻿using BackupApp.Helper;
-using StdOttStandard.Linq.DataStructures;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Data.SQLite;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace BackupApp.Backup.Result
 {
-    public class BackupWriteDb : IDisposable, INotifyPropertyChanged
+    public class BackupWriteDb : IDisposable
     {
-        private readonly SQLiteConnection connection;
-        private readonly SemaphoreSlim writeSem;
-        private long lastFolderIndex, lastFileIndex, foldersFilesTotalCount;
+        private long lastFolderIndex, lastFileIndex;
         private readonly IDictionary<string, long> fileIds;
-        private readonly LockQueue<DbFolder> folders;
-        private readonly LockQueue<DbFile> files;
-        private readonly LockQueue<DbFolderFile> foldersFiles;
-        private readonly LockQueue<long> flushedFolderIds, flushedFileIds;
-        private double foldersProgress, filesProgress, foldersFilesProgress;
-
-        public bool Disposed { get; private set; }
+        private readonly SQLiteConnection connection;
+        private readonly SQLiteTransaction transaction;
+        private readonly SQLiteCommand insertFoldersCmd, insertFilesCmd, insertFoldersFilesCmd;
 
         public string Path { get; }
 
-        public Task FlushTask { get; private set; }
-
-        public double FoldersProgress
+        public BackupWriteDb(string path)
         {
-            get => foldersProgress;
-            private set
-            {
-                if (value == foldersProgress) return;
-
-                foldersProgress = value;
-                OnPropertyChanged(nameof(FoldersProgress));
-            }
-        }
-
-        public double FilesProgress
-        {
-            get => filesProgress;
-            private set
-            {
-                if (value == filesProgress) return;
-
-                filesProgress = value;
-                OnPropertyChanged(nameof(FilesProgress));
-            }
-        }
-
-        public double FoldersFilesProgress
-        {
-            get => foldersFilesProgress;
-            private set
-            {
-                if (value == foldersFilesProgress) return;
-
-                foldersFilesProgress = value;
-                OnPropertyChanged(nameof(FoldersFilesProgress));
-            }
-        }
-
-        private BackupWriteDb(SQLiteConnection connection, string path)
-        {
-            this.connection = connection;
-            writeSem = new SemaphoreSlim(1);
+            connection = new SQLiteConnection($"Data Source={path};Version=3;New=True;").OpenAndReturn();
             Path = path;
 
-            lastFolderIndex = lastFileIndex = foldersFilesTotalCount = 0;
+            lastFolderIndex = lastFileIndex = 0;
+
+            transaction = connection.BeginTransaction();
+            CreateTablesCmd();
+
+            insertFoldersCmd = new SQLiteCommand(
+                "INSERT INTO folders (id, name, parent_id) VALUES (@id, @name, @parentId);",
+                connection,
+                transaction);
+
+            insertFilesCmd = new SQLiteCommand(
+                "INSERT INTO files (id, hash, file_name) VALUES (@id, @hash, @fileName);",
+                connection,
+                transaction);
+
+            insertFoldersFilesCmd = new SQLiteCommand(
+                "INSERT INTO folders_files (file_name, folder_id, file_id) VALUES (@fileName, @folderId, @fileId);",
+                connection,
+                transaction);
+
             fileIds = new Dictionary<string, long>();
-            folders = new LockQueue<DbFolder>();
-            files = new LockQueue<DbFile>();
-            foldersFiles = new LockQueue<DbFolderFile>();
-            flushedFolderIds = new LockQueue<long>();
-            flushedFileIds = new LockQueue<long>();
         }
 
-        public static async Task<BackupWriteDb> Create(string filePath)
-        {
-            SQLiteConnection connection = new SQLiteConnection($"Data Source={filePath};Version=3;New=True;");
-            await connection.OpenAsync();
-            await CreateTables(connection);
-
-            BackupWriteDb db = new BackupWriteDb(connection, filePath);
-            db.FlushTask = db.Flush();
-            return db;
-        }
-
-        private static Task CreateTables(SQLiteConnection connection)
+        private void CreateTablesCmd()
         {
             const string sql = @"
                 CREATE TABLE folders
@@ -118,33 +72,43 @@ namespace BackupApp.Backup.Result
                 );
             ";
 
-            return connection.ExecuteNonQueryAsync(sql);
+            SQLiteCommand cmd = new SQLiteCommand(sql, connection, transaction);
+            cmd.ExecuteNonQuery();
         }
 
-        private Task AddedIndexies()
+        private void AddedIndexiesCmd()
         {
             const string sql = @"
                 CREATE INDEX folders_parent_id_idx ON folders (parent_id);
                 CREATE INDEX folders_files_folder_id_idx ON folders_files (folder_id);
             ";
 
-            return connection.ExecuteNonQueryAsync(sql);
+            SQLiteCommand cmd = new SQLiteCommand(sql, connection, transaction);
+            cmd.ExecuteNonQuery();
         }
 
-        private async Task Flush()
+        public void Commit()
         {
-            await Task.WhenAll(Task.Run(FlushFolders), Task.Run(FlushFiles), Task.Run(FlushFoldersFiles));
-
-            if (!Disposed) await AddedIndexies();
-
-            Dispose();
+            try
+            {
+                AddedIndexiesCmd();
+                transaction.Commit();
+            }
+            finally
+            {
+                Dispose();
+            }
         }
 
         public long AddFolder(string name, long? parentId)
         {
-            lock (folders)
+            lock (insertFoldersCmd)
             {
-                folders.Enqueue(new DbFolder(++lastFolderIndex, parentId, name));
+                insertFoldersCmd.Parameters.Add(DbHelper.GetParam("@id", ++lastFolderIndex));
+                insertFoldersCmd.Parameters.Add(DbHelper.GetParam("@name", name));
+                insertFoldersCmd.Parameters.Add(DbHelper.GetParam("@parentId", parentId));
+                insertFoldersCmd.ExecuteNonQuery();
+
                 return lastFolderIndex;
             }
         }
@@ -159,181 +123,32 @@ namespace BackupApp.Backup.Result
                     fileId = ++lastFileIndex;
                     fileIds.Add(hash, fileId);
 
-                    files.Enqueue(new DbFile(fileId, hash, backupFileName));
+                    insertFilesCmd.Parameters.Add(DbHelper.GetParam("@id", fileId));
+                    insertFilesCmd.Parameters.Add(DbHelper.GetParam("@hash", hash));
+                    insertFilesCmd.Parameters.Add(DbHelper.GetParam("@fileName", backupFileName));
+                    insertFilesCmd.ExecuteNonQuery();
                 }
 
-                foldersFilesTotalCount++;
+                insertFoldersFilesCmd.Parameters.Add(DbHelper.GetParam("@fileName", name));
+                insertFoldersFilesCmd.Parameters.Add(DbHelper.GetParam("@folderId", folderId));
+                insertFoldersFilesCmd.Parameters.Add(DbHelper.GetParam("@fileId", fileId));
+                insertFoldersFilesCmd.ExecuteNonQuery();
             }
-
-            foldersFiles.Enqueue(new DbFolderFile(folderId, fileId, name));
-        }
-
-        private async Task FlushFolders()
-        {
-            long lastId = 0;
-            SqlStatementBuilder builder = new SqlStatementBuilder("INSERT INTO folders (id, name, parent_id) VALUES ");
-
-            while (true)
-            {
-                DbFolder item;
-                if (!folders.TryDequeue(out item))
-                {
-                    if (builder.DataCount > 0) await Execute();
-                    break;
-                }
-                if (Disposed) break;
-
-                string sql = $",(@id{builder.DataCount}, @name{builder.DataCount}, @parentId{builder.DataCount})";
-                if (builder.DataCount == 0) sql = sql.TrimStart(',');
-
-                builder.Add(sql, DbHelper.GetParam("@id" + builder.DataCount, item.ID),
-                    DbHelper.GetParam("@name" + builder.DataCount, item.Name),
-                    DbHelper.GetParam("@parentId" + builder.DataCount, item.ParentID));
-
-                lastId = item.ID;
-
-                if (builder.DataCount > 2000 || (builder.DataCount > 500 && folders.Count == 0)) await Execute();
-            }
-
-            flushedFolderIds.End();
-
-            async Task Execute()
-            {
-                await ExecuteNonQueryAsync(builder);
-                flushedFolderIds.Enqueue(lastId);
-
-                FoldersProgress = 1 - folders.Count / (double)lastFolderIndex;
-            }
-        }
-
-        private async Task FlushFiles()
-        {
-            long lastId = 0;
-            SqlStatementBuilder builder = new SqlStatementBuilder("INSERT INTO files (id, hash, file_name) VALUES ");
-
-            while (true)
-            {
-                DbFile item;
-                if (!files.TryDequeue(out item))
-                {
-                    if (builder.DataCount > 0) await Execute();
-                    break;
-                }
-                if (Disposed) break;
-
-                string sql = $",(@id{builder.DataCount}, @hash{builder.DataCount}, @fileName{builder.DataCount})";
-                if (builder.DataCount == 0) sql = sql.TrimStart(',');
-
-                builder.Add(sql, DbHelper.GetParam("@id" + builder.DataCount, item.ID),
-                    DbHelper.GetParam("@hash" + builder.DataCount, item.Hash),
-                    DbHelper.GetParam("@fileName" + builder.DataCount, item.FileName));
-
-                lastId = item.ID;
-
-                if (builder.DataCount > 2000 || (builder.DataCount > 500 && files.Count == 0)) await Execute();
-            }
-
-            flushedFileIds.End();
-
-            async Task Execute()
-            {
-                await ExecuteNonQueryAsync(builder);
-                flushedFileIds.Enqueue(lastId);
-
-                FilesProgress = 1 - files.Count / (double)lastFileIndex;
-            }
-        }
-
-        private async Task FlushFoldersFiles()
-        {
-            long lastFlushedFolderId = -1, lastAddedFolderId = -1, lastFlushedFileId = -1, lastAddedFileId = -1;
-            SqlStatementBuilder builder =
-                new SqlStatementBuilder("INSERT INTO folders_files (file_name, folder_id, file_id) VALUES ");
-
-            while (true)
-            {
-                DbFolderFile item;
-                if (!foldersFiles.TryDequeue(out item))
-                {
-                    if (builder.DataCount > 0) await Execute();
-                    return;
-                }
-                if (Disposed) break;
-
-                string sql = $",(@fileName{builder.DataCount}, @folderId{builder.DataCount}, @fileId{builder.DataCount})";
-                if (builder.DataCount == 0) sql = sql.TrimStart(',');
-
-                builder.Add(sql, DbHelper.GetParam("@fileName" + builder.DataCount, item.FileName),
-                    DbHelper.GetParam("@folderId" + builder.DataCount, item.FolderID),
-                    DbHelper.GetParam("@fileId" + builder.DataCount, item.FileID));
-
-                lastAddedFolderId = item.FolderID;
-                lastAddedFileId = item.FileID;
-
-                if (builder.DataCount > 5000 || (builder.DataCount > 2000 && foldersFiles.Count == 0)) await Execute();
-            }
-
-            async Task Execute()
-            {
-                while (lastAddedFolderId > lastFlushedFolderId)
-                {
-                    (bool isEnd, long id) = flushedFolderIds.Dequeue();
-                    if (isEnd) return;
-                    else lastFlushedFolderId = id;
-                }
-                while (lastAddedFileId > lastFlushedFileId)
-                {
-                    (bool isEnd, long id) = flushedFileIds.Dequeue();
-                    if (isEnd) return;
-                    else lastFlushedFileId = id;
-                }
-
-                if (Disposed) return;
-                await ExecuteNonQueryAsync(builder);
-
-                FoldersFilesProgress = 1 - foldersFiles.Count / (double)foldersFilesTotalCount;
-            }
-        }
-
-        private async Task ExecuteNonQueryAsync(SqlStatementBuilder builder)
-        {
-            (string sql, SQLiteParameter[] parameters) = builder.Reset();
-            try
-            {
-                await writeSem.WaitAsync();
-                if (!Disposed) await connection.ExecuteNonQueryAsync(sql, parameters);
-            }
-            catch
-            {
-                Dispose();
-            }
-            finally
-            {
-                writeSem.Release();
-            }
-        }
-
-        public void Finish()
-        {
-            folders.End();
-            files.End();
-            foldersFiles.End();
         }
 
         public void Dispose()
         {
-            if (Disposed) return;
+            fileIds.Clear();
+            transaction?.Dispose();
 
-            Finish();
-            Disposed = true;
-            connection.Dispose();
-        }
+            insertFoldersCmd?.Dispose();
+            insertFilesCmd?.Dispose();
+            insertFoldersFilesCmd?.Dispose();
 
-        public event PropertyChangedEventHandler PropertyChanged;
+            connection?.Close();
 
-        private void OnPropertyChanged(string name)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+            GC.Collect();
+            GC.WaitForPendingFinalizers();
         }
     }
 }

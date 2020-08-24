@@ -162,7 +162,7 @@ namespace BackupApp.Backup.Handling
                 Task<IDictionary<string, string>> allFilesTask =
                     Task.Run(() => BackupUtils.GetAllFiles(DestFolderPath, CancelToken));
 
-                DB = await BackupUtils.CreateDb(Path.GetTempPath(), Started);
+                DB = BackupUtils.CreateDb(Path.GetTempPath(), Started);
                 Dictionary<Task, TaskBackupItem> dict = Items.ToDictionary(i => i.BeginBackup(DB));
 
                 IDictionary<string, string> allFiles = await allFilesTask;
@@ -181,20 +181,18 @@ namespace BackupApp.Backup.Handling
                     dict.Remove(filesLoadedTask);
                 }
 
-                DB.Finish();
-
-                if (AddedFiles.Count > 0 && !CancelToken.IsCanceled && !DB.Disposed)
+                if (AddedFiles.Count > 0 && !CancelToken.IsCanceled)
                 {
                     IsFlushing = true;
 
-                    CancelToken.Canceled += OnCanceled;
-                    await DB.FlushTask;
-                    CancelToken.Canceled -= OnCanceled;
+                    DB.Commit();
 
                     if (!CancelToken.IsCanceled)
                     {
                         destDbPath = Path.Combine(DestFolderPath, Path.GetFileName(DB.Path));
-                        File.Move(DB.Path, destDbPath);
+                        File.Copy(DB.Path, destDbPath);
+
+                        DeleteFile(DB.Path);
 
                         DebugEvent.SaveText("HandleBackupSuccessful");
                         Failed = false;
@@ -203,9 +201,8 @@ namespace BackupApp.Backup.Handling
                 }
 
                 DB.Dispose();
-                await DB.FlushTask;
 
-                File.Delete(DB.Path);
+                DeleteFile(DB.Path);
 
                 foreach (string addedFile in AddedFiles)
                 {
@@ -239,7 +236,7 @@ namespace BackupApp.Backup.Handling
 
                 try
                 {
-                    if (DB != null) File.Delete(DB.Path);
+                    if (DB != null) DeleteFile(DB.Path);
                 }
                 catch (Exception e2)
                 {
@@ -263,10 +260,23 @@ namespace BackupApp.Backup.Handling
                 IsLoadingBackupedFiles = false;
                 IsFlushing = false;
             }
+        }
 
-            void OnCanceled(object sender, EventArgs args)
+        public static async void DeleteFile(string path)
+        {
+            while (File.Exists(path))
             {
-                DB?.Dispose();
+                try
+                {
+                    File.Delete(path);
+                    return;
+                }
+                catch
+                {
+                    System.Diagnostics.Debug.WriteLine("Failed deleting file: " + path);
+                }
+
+                await Task.Delay(5000);
             }
         }
 
