@@ -7,12 +7,15 @@ namespace BackupApp.Backup.Handling
 {
     public class BackupedFiles
     {
-        public readonly IDictionary<string, string> hashes, fileNames;
+        private readonly IDictionary<string, string> hashes, fileNames;
+        private readonly List<string> dbNames;
 
-        public BackupedFiles(IDictionary<string, string> hashes)
+        public BackupedFiles(IDictionary<string, string> hashes, IEnumerable<string> dbNames)
         {
             this.hashes = hashes;
             fileNames = hashes.Values.ToDictionary(v => Path.GetFileNameWithoutExtension(v));
+
+            this.dbNames = dbNames.ToList();
         }
 
         public bool Add(string hash, string extension, out string backupFileName)
@@ -39,6 +42,21 @@ namespace BackupApp.Backup.Handling
             fileNames.Add(name, fileName);
 
             return fileName;
+        }
+
+        public void AddDbName(string dbName)
+        {
+            dbNames.Add(dbName);
+        }
+
+        public IEnumerable<KeyValuePair<string,string>> GetFilePairs()
+        {
+            return hashes;
+        }
+
+        public IEnumerable<string> GetDbNames()
+        {
+            return dbNames;
         }
     }
 }

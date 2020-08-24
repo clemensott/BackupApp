@@ -159,14 +159,13 @@ namespace BackupApp.Backup.Handling
             try
             {
                 IsLoadingBackupedFiles = true;
-                Task<IDictionary<string, string>> allFilesTask =
-                    Task.Run(() => BackupUtils.GetAllFiles(DestFolderPath, CancelToken));
+                Task<BackupedFiles> allFilesTask =
+                    Task.Run(() => BackupUtils.GetBackupedFiles(DestFolderPath, CancelToken));
 
                 DB = BackupUtils.CreateDb(Path.GetTempPath(), Started);
                 Dictionary<Task, TaskBackupItem> dict = Items.ToDictionary(i => i.BeginBackup(DB));
 
-                IDictionary<string, string> allFiles = await allFilesTask;
-                BackupedFiles backupedFiles = new BackupedFiles(allFiles);
+                BackupedFiles backupedFiles = await allFilesTask;
                 IsLoadingBackupedFiles = false;
 
                 if (!Directory.Exists(FilesBackupDir)) Directory.CreateDirectory(FilesBackupDir);
@@ -190,8 +189,10 @@ namespace BackupApp.Backup.Handling
                     if (!CancelToken.IsCanceled)
                     {
                         destDbPath = Path.Combine(DestFolderPath, Path.GetFileName(DB.Path));
-                        File.Copy(DB.Path, destDbPath);
+                        backupedFiles.AddDbName(Path.GetFileName(destDbPath));
 
+                        File.Copy(DB.Path, destDbPath);
+                        BackupUtils.SaveLocalBackupedFilesCache(backupedFiles);
                         DeleteFile(DB.Path);
 
                         DebugEvent.SaveText("HandleBackupSuccessful");
