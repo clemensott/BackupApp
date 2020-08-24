@@ -10,7 +10,7 @@ namespace BackupApp
         {
             DateTime? dateTime = (DateTime?)value;
 
-            return dateTime.HasValue ? dateTime.Value.GetDateTimeFormats()[14] : "None";
+            return dateTime.HasValue ? dateTime.Value.ToString("F") : "None";
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

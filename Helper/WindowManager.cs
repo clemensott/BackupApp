@@ -120,7 +120,12 @@ namespace BackupApp
 
         private void MainWindow_StateChanged(object sender, EventArgs e)
         {
-            if (mainWindow.WindowState == WindowState.Minimized) HideWindows();
+            if (mainWindow.WindowState == WindowState.Minimized)
+            {
+                HideWindows();
+                viewModel.IsHidden = true;
+            }
+            else viewModel.IsHidden = false;
         }
 
         private void MainWindow_Closing(object sender, CancelEventArgs e)

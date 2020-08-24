@@ -6,7 +6,6 @@ using System.Threading.Tasks;
 using BackupApp.Backup.Result;
 using BackupApp.Restore;
 using StdOttStandard.Linq;
-using StdOttStandard.Linq.DataStructures;
 
 namespace BackupApp.Helper
 {
@@ -19,10 +18,10 @@ namespace BackupApp.Helper
             return Path.Combine(baseFolderPath, backupFilesDirName);
         }
 
-        public async static Task<IDictionary<string, string>> GetAllFiles(string folderPath)
+        public async static Task<IDictionary<string, string>> GetAllFiles(string folderPath, CancelToken cancelToken = null)
         {
             IDictionary<string, string> files = new Dictionary<string, string>();
-            await Task.WhenAll(GetReadDBs(folderPath).ToNotNull().Select(db => db.GetAllFiles(files)));
+            await Task.WhenAll(GetReadDBs(folderPath).ToNotNull().Select(db => db.GetAllFiles(files, cancelToken)));
 
             return files;
         }

@@ -7,7 +7,6 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Serialization;
 
@@ -17,7 +16,7 @@ namespace BackupApp.LocalSave
     {
         private static readonly XmlSerializer serializer = new XmlSerializer(typeof(Settings));
 
-        private string path;
+        private readonly string path;
         private ViewModel model;
         private BackupConfig currentSubscribeConfig;
 

@@ -55,6 +55,7 @@ namespace BackupApp.Restore
                     SELECT id, name
                     FROM folders
                     WHERE parent_id IS NULL
+                       OR parent_id = 0
                     ORDER BY name;
                 ";
                 parameters = null;
@@ -123,7 +124,7 @@ namespace BackupApp.Restore
             }
         }
 
-        public async Task GetAllFiles(IDictionary<string, string> dict)
+        public async Task GetAllFiles(IDictionary<string, string> dict, CancelToken cancelToken = null)
         {
             const string sql = @"
                 SELECT hash, file_name
@@ -134,14 +135,15 @@ namespace BackupApp.Restore
             SQLiteConnection connection = await GetConnection(Path);
             try
             {
-                DbDataReader reader = await connection.ExecuteReaderAsync(sql);
-
-                int hashIndex = reader.GetOrdinal("hash");
-                int fileNameIndex = reader.GetOrdinal("file_name");
-
-                while (await reader.ReadAsync())
+                using (DbDataReader reader = await connection.ExecuteReaderAsync(sql))
                 {
-                    dict[reader.GetString(hashIndex)] = reader.GetString(fileNameIndex);
+                    int hashIndex = reader.GetOrdinal("hash");
+                    int fileNameIndex = reader.GetOrdinal("file_name");
+
+                    while (await reader.ReadAsync() && cancelToken?.IsCanceled != true)
+                    {
+                        dict[reader.GetString(hashIndex)] = reader.GetString(fileNameIndex);
+                    }
                 }
             }
             finally

@@ -8,7 +8,7 @@ namespace BackupApp
     {
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            return Math.Round((double)value * 100) + " %";
+            return value is double ? Math.Round((double)value * 100) + " %" : string.Empty;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

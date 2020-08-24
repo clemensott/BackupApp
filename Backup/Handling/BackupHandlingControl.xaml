@@ -12,6 +12,7 @@
         <local:ProgressTextConverter x:Key="progressCon"/>
         <con:FalsyConverter x:Key="invCon"/>
         <con:VisibleHiddenConverter x:Key="visCon"/>
+        <con:CollapsedVisibleConverter x:Key="colCon"/>
     </UserControl.Resources>
 
     <Grid Name="gidMain" DataContext="{x:Null}">
@@ -20,8 +21,8 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <ListBox Margin="5" ItemsSource="{Binding Items}"
-                 IsEnabled="{Binding IsFlushing,Converter={StaticResource invCon}}">
+        <ListBox ItemsSource="{Binding Items}"
+                 Visibility="{Binding IsFlushing,Converter={StaticResource colCon}}">
             <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem">
                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -32,7 +33,7 @@
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" MinWidth="160"/>
-                            <ColumnDefinition Width="100"/>
+                            <ColumnDefinition Width="*" MinWidth="100" MaxWidth="400"/>
                         </Grid.ColumnDefinitions>
 
                         <TextBlock Grid.Column="0" Text="{Binding Name}" Margin="0,0,10,0"/>
@@ -50,10 +51,56 @@
         <TextBlock Text="Is loading backuped files..." VerticalAlignment="Center" HorizontalAlignment="Center"
                    Visibility="{Binding IsLoadingBackupedFiles,Converter={StaticResource visCon}}"/>
 
-        <TextBlock Text="Is saving backup..." VerticalAlignment="Center" HorizontalAlignment="Center"
-                   Visibility="{Binding IsFlushing,Converter={StaticResource visCon}}"/>
+        <Grid Visibility="{Binding IsFlushing,Converter={StaticResource visCon}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
 
-        <Button Grid.Row="1" Content="Cancel" Width="100" Margin="5,0,5,5" HorizontalAlignment="Right"
+            <TextBlock Text="Saving structure:" FontWeight="Bold"/>
+
+            <Grid Grid.Row="1" DataContext="{Binding DB}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0" Grid.Row="0" Text="Folders:" 
+                           Margin="0,0,10,0" VerticalAlignment="Center"/>
+                <Grid Grid.Column="1" Grid.Row="0" Margin="0,5,0,0" 
+                      DataContext="{Binding FoldersProgress,Mode=OneWay}">
+                    <ProgressBar Maximum="1" Value="{Binding Mode=OneWay}"/>
+                    <TextBlock HorizontalAlignment="Center" 
+                               Text="{Binding Mode=OneWay,Converter={StaticResource progressCon}}"/>
+                </Grid>
+
+                <TextBlock Grid.Column="0" Grid.Row="1" Text="Files:" 
+                           Margin="0,0,10,0" VerticalAlignment="Center"/>
+                <Grid Grid.Column="1" Grid.Row="1" Margin="0,5,0,0" 
+                      DataContext="{Binding FilesProgress,Mode=OneWay}">
+                    <ProgressBar Maximum="1" Value="{Binding Mode=OneWay}"/>
+                    <TextBlock HorizontalAlignment="Center" 
+                               Text="{Binding Mode=OneWay,Converter={StaticResource progressCon}}"/>
+                </Grid>
+
+                <TextBlock Grid.Column="0" Grid.Row="2" Text="Assosiations:"
+                           Margin="0,0,10,0" VerticalAlignment="Center"/>
+                <Grid Grid.Column="1" Grid.Row="2" Margin="0,5,0,0" 
+                      DataContext="{Binding FoldersFilesProgress,Mode=OneWay}">
+                    <ProgressBar Maximum="1" Value="{Binding Mode=OneWay}"/>
+                    <TextBlock HorizontalAlignment="Center" 
+                               Text="{Binding Mode=OneWay,Converter={StaticResource progressCon}}"/>
+                </Grid>
+            </Grid>
+        </Grid>
+
+        <Button Grid.Row="1" Content="Cancel" Width="100" Margin="5,5,0,0" HorizontalAlignment="Right"
                 IsEnabled="{Binding CancelToken.IsCanceled,Converter={StaticResource invCon}}"
                 Click="BtnCloseCancel_Click"/>
     </Grid>

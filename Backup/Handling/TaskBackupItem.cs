@@ -6,7 +6,6 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using StdOttStandard.Linq;
 using BackupApp.Backup.Result;
 
 namespace BackupApp.Backup.Handling
@@ -14,9 +13,9 @@ namespace BackupApp.Backup.Handling
     public class TaskBackupItem : INotifyPropertyChanged
     {
         private bool finished;
-        private int totalCount, currentCount;
+        private int currentCount;
         private double progress;
-        private BackupFolder baseFolder;
+        private readonly List<BackupFile> allFiles;
 
         public bool Finished
         {
@@ -44,57 +43,99 @@ namespace BackupApp.Backup.Handling
 
         public string Name { get; }
 
+        public string FilesDestFolderPath { get; }
+
         public Folder Folder { get; }
+
+        public IList<string> AddedFiles { get; }
 
         public CancelToken CancelToken { get; }
 
-        public TaskBackupItem(string name, Folder folder, CancelToken cancelToken)
+        public BackupWriteDb DB { get; private set; }
+
+        public TaskBackupItem(string name, string filesDestFolderPath,
+            Folder folder, IList<string> addedFiles, CancelToken cancelToken)
         {
+            allFiles = new List<BackupFile>();
             Name = name;
+            FilesDestFolderPath = filesDestFolderPath;
             Folder = folder;
+            AddedFiles = addedFiles;
             CancelToken = cancelToken;
         }
 
-        public Task BeginBackup()
+        public Task BeginBackup(BackupWriteDb db)
         {
-            return Task.Run(() =>
-            {
-                baseFolder = BackupFolder.FromPath(Folder, Name);
-                totalCount = GenerateUtils.SelectRecursive(baseFolder, f => f.Folders)
-                    .Select(f => f.Files.Length).Sum();
-            });
+            DB = db;
+            return Task.Run((Action)LoadFiles);
         }
 
-        public void Backup(string filesDestFolderPath, BackupWriteDb db,
-            BackupedFiles backupedFiles, IList<string> addedFiles)
+        public void LoadFiles()
+        {
+            Queue<BackupFolder> folderQueue = new Queue<BackupFolder>();
+            folderQueue.Enqueue(new BackupFolder(Name, Folder));
+
+            while (folderQueue.Count > 0)
+            {
+                BackupFolder currentFolder = folderQueue.Dequeue();
+                if (IsHidden(currentFolder.Directory)) continue;
+
+                long folderId = DB.AddFolder(currentFolder.Name, currentFolder.ParentId);
+
+                IEnumerable<BackupFolder> folders;
+                IEnumerable<BackupFile> files;
+                try
+                {
+                    switch (currentFolder.SubType)
+                    {
+                        case SubfolderType.No:
+                            folders = new BackupFolder[0];
+                            files = new BackupFile[0];
+                            break;
+
+                        case SubfolderType.This:
+                            folders = new BackupFolder[0];
+                            files = currentFolder.Directory.GetFiles().Select(BackupFile.FromPath);
+                            break;
+
+                        case SubfolderType.All:
+                            folders = currentFolder.Directory.GetDirectories()
+                                .Select(d => new BackupFolder(folderId, d, SubfolderType.All));
+                            files = currentFolder.Directory.GetFiles().Select(BackupFile.FromPath);
+                            break;
+
+                        default:
+                            throw new ArgumentOutOfRangeException(nameof(currentFolder.SubType), currentFolder.SubType, null);
+                    }
+                }
+                catch
+                {
+                    folders = new BackupFolder[0];
+                    files = new BackupFile[0];
+                }
+
+                foreach (BackupFolder subFolder in folders)
+                {
+                    folderQueue.Enqueue(subFolder);
+                }
+
+                foreach (BackupFile file in files)
+                {
+                    allFiles.Add(file);
+                }
+            }
+        }
+
+        public void Backup(BackupedFiles backupedFiles)
         {
             currentCount = 0;
 
             try
             {
-                Queue<BackupFolder> folderQueue = new Queue<BackupFolder>();
-                Queue<BackupFile> fileQueue = new Queue<BackupFile>();
-                folderQueue.Enqueue(baseFolder);
+                Parallel.ForEach(allFiles,
+                    f => DoBackupFile(f.File, f.FolderId, backupedFiles));
 
-                while (folderQueue.Count > 0)
-                {
-                    BackupFolder currentFolder = folderQueue.Dequeue();
-                    long folderId = db.AddFolder(currentFolder.Name, currentFolder.ParentId);
-
-                    foreach (BackupFolder subFolder in currentFolder.Folders)
-                    {
-                        subFolder.ParentId = folderId;
-                        folderQueue.Enqueue(subFolder);
-                    }
-
-                    foreach (BackupFile file in currentFolder.Files)
-                    {
-                        fileQueue.Enqueue(file);
-                    }
-                }
-
-                Parallel.ForEach(fileQueue,
-                    f => DoBackupFile(f.File, f.FolderId, filesDestFolderPath, db, backupedFiles, addedFiles));
+                allFiles.Clear();
             }
             finally
             {
@@ -102,36 +143,35 @@ namespace BackupApp.Backup.Handling
             }
         }
 
-        private void DoBackupFile(FileInfo file, long folderId, string filesDestFolderPath,
-            BackupWriteDb db, BackupedFiles backupedFiles, IList<string> addedFiles)
+        private void DoBackupFile(FileInfo file, long folderId, BackupedFiles backupedFiles)
         {
             try
             {
-                if (CancelToken.IsCanceled || IsHidden(file) || db.Disposed) return;
+                if (CancelToken.IsCanceled || DB.Disposed || IsHidden(file)) return;
 
                 string backupFileName;
                 string fileHash = GetHash(file.FullName);
 
-                if (CancelToken.IsCanceled || db.Disposed) return;
+                if (CancelToken.IsCanceled || DB.Disposed) return;
 
                 if (backupedFiles.Add(fileHash, file.Extension, out backupFileName))
                 {
-                    string destPath = Path.Combine(filesDestFolderPath, backupFileName);
+                    string destPath = Path.Combine(FilesDestFolderPath, backupFileName);
 
                     if (File.Exists(destPath)) File.Delete(destPath);
                     File.Copy(file.FullName, destPath);
 
-                    addedFiles.Add(destPath);
+                    AddedFiles.Add(destPath);
                 }
 
-                db.AddFile(file.Name, fileHash, backupFileName, folderId);
+                DB.AddFile(file.Name, fileHash, backupFileName, folderId);
             }
             catch { }
             finally
             {
                 currentCount++;
 
-                Progress = totalCount > 0 ? Math.Round(currentCount / (double)totalCount, 2) : 0;
+                Progress = allFiles.Count > 0 ? Math.Round(currentCount / (double)allFiles.Count, 2) : 0;
             }
         }
 

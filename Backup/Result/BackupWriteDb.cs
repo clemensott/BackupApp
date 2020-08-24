@@ -2,22 +2,24 @@
 using StdOttStandard.Linq.DataStructures;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Data.SQLite;
 using System.Threading;
 using System.Threading.Tasks;
 
 namespace BackupApp.Backup.Result
 {
-    public class BackupWriteDb : IDisposable
+    public class BackupWriteDb : IDisposable, INotifyPropertyChanged
     {
         private readonly SQLiteConnection connection;
         private readonly SemaphoreSlim writeSem;
-        private long lastFolderIndex, lastFileIndex;
+        private long lastFolderIndex, lastFileIndex, foldersFilesTotalCount;
         private readonly IDictionary<string, long> fileIds;
         private readonly LockQueue<DbFolder> folders;
         private readonly LockQueue<DbFile> files;
         private readonly LockQueue<DbFolderFile> foldersFiles;
         private readonly LockQueue<long> flushedFolderIds, flushedFileIds;
+        private double foldersProgress, filesProgress, foldersFilesProgress;
 
         public bool Disposed { get; private set; }
 
@@ -25,13 +27,49 @@ namespace BackupApp.Backup.Result
 
         public Task FlushTask { get; private set; }
 
+        public double FoldersProgress
+        {
+            get => foldersProgress;
+            private set
+            {
+                if (value == foldersProgress) return;
+
+                foldersProgress = value;
+                OnPropertyChanged(nameof(FoldersProgress));
+            }
+        }
+
+        public double FilesProgress
+        {
+            get => filesProgress;
+            private set
+            {
+                if (value == filesProgress) return;
+
+                filesProgress = value;
+                OnPropertyChanged(nameof(FilesProgress));
+            }
+        }
+
+        public double FoldersFilesProgress
+        {
+            get => foldersFilesProgress;
+            private set
+            {
+                if (value == foldersFilesProgress) return;
+
+                foldersFilesProgress = value;
+                OnPropertyChanged(nameof(FoldersFilesProgress));
+            }
+        }
+
         private BackupWriteDb(SQLiteConnection connection, string path)
         {
             this.connection = connection;
             writeSem = new SemaphoreSlim(1);
             Path = path;
 
-            lastFolderIndex = lastFileIndex = 0;
+            lastFolderIndex = lastFileIndex = foldersFilesTotalCount = 0;
             fileIds = new Dictionary<string, long>();
             folders = new LockQueue<DbFolder>();
             files = new LockQueue<DbFile>();
@@ -104,8 +142,11 @@ namespace BackupApp.Backup.Result
 
         public long AddFolder(string name, long? parentId)
         {
-            folders.Enqueue(new DbFolder(++lastFolderIndex, parentId, name));
-            return lastFolderIndex;
+            lock (folders)
+            {
+                folders.Enqueue(new DbFolder(++lastFolderIndex, parentId, name));
+                return lastFolderIndex;
+            }
         }
 
         public void AddFile(string name, string hash, string backupFileName, long folderId)
@@ -120,6 +161,8 @@ namespace BackupApp.Backup.Result
 
                     files.Enqueue(new DbFile(fileId, hash, backupFileName));
                 }
+
+                foldersFilesTotalCount++;
             }
 
             foldersFiles.Enqueue(new DbFolderFile(folderId, fileId, name));
@@ -149,7 +192,7 @@ namespace BackupApp.Backup.Result
 
                 lastId = item.ID;
 
-                if (builder.DataCount > 1000 || (builder.DataCount > 500 && folders.Count == 0)) await Execute();
+                if (builder.DataCount > 2000 || (builder.DataCount > 500 && folders.Count == 0)) await Execute();
             }
 
             flushedFolderIds.End();
@@ -158,6 +201,8 @@ namespace BackupApp.Backup.Result
             {
                 await ExecuteNonQueryAsync(builder);
                 flushedFolderIds.Enqueue(lastId);
+
+                FoldersProgress = 1 - folders.Count / (double)lastFolderIndex;
             }
         }
 
@@ -185,7 +230,7 @@ namespace BackupApp.Backup.Result
 
                 lastId = item.ID;
 
-                if (builder.DataCount > 1000 || (builder.DataCount > 500 && files.Count == 0)) await Execute();
+                if (builder.DataCount > 2000 || (builder.DataCount > 500 && files.Count == 0)) await Execute();
             }
 
             flushedFileIds.End();
@@ -194,13 +239,16 @@ namespace BackupApp.Backup.Result
             {
                 await ExecuteNonQueryAsync(builder);
                 flushedFileIds.Enqueue(lastId);
+
+                FilesProgress = 1 - files.Count / (double)lastFileIndex;
             }
         }
 
         private async Task FlushFoldersFiles()
         {
             long lastFlushedFolderId = -1, lastAddedFolderId = -1, lastFlushedFileId = -1, lastAddedFileId = -1;
-            SqlStatementBuilder builder = new SqlStatementBuilder("INSERT INTO folders_files (file_name, folder_id, file_id) VALUES ");
+            SqlStatementBuilder builder =
+                new SqlStatementBuilder("INSERT INTO folders_files (file_name, folder_id, file_id) VALUES ");
 
             while (true)
             {
@@ -222,7 +270,7 @@ namespace BackupApp.Backup.Result
                 lastAddedFolderId = item.FolderID;
                 lastAddedFileId = item.FileID;
 
-                if (builder.DataCount > 2000 || (builder.DataCount > 1000 && foldersFiles.Count == 0)) await Execute();
+                if (builder.DataCount > 5000 || (builder.DataCount > 2000 && foldersFiles.Count == 0)) await Execute();
             }
 
             async Task Execute()
@@ -242,6 +290,8 @@ namespace BackupApp.Backup.Result
 
                 if (Disposed) return;
                 await ExecuteNonQueryAsync(builder);
+
+                FoldersFilesProgress = 1 - foldersFiles.Count / (double)foldersFilesTotalCount;
             }
         }
 
@@ -277,6 +327,13 @@ namespace BackupApp.Backup.Result
             Finish();
             Disposed = true;
             connection.Dispose();
+        }
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        private void OnPropertyChanged(string name)
+        {
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
     }
 }

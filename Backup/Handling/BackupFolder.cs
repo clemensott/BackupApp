@@ -6,98 +6,35 @@ using FolderFile;
 
 namespace BackupApp.Backup.Handling
 {
-    public class BackupFolder : INotifyPropertyChanged
+    public struct BackupFolder
     {
-        private BackupFolder[] folders;
-        private BackupFile[] files;
-
-        public long ParentId { get; set; }
+        public long? ParentId { get; }
 
         public string Name { get; }
 
-        public BackupFolder[] Folders
-        {
-            get => folders;
-            set
-            {
-                if (value == folders) return;
+        public DirectoryInfo Directory { get; }
 
-                folders = value;
-                OnPropertyChanged(nameof(Folders));
-            }
+        public SubfolderType SubType { get; }
+
+        public BackupFolder(long? parentId, DirectoryInfo directory, SubfolderType subType)
+        {
+            ParentId = parentId;
+            Directory = directory;
+            Name = Directory.Name;
+            SubType = subType;
         }
 
-        public BackupFile[] Files
+        public BackupFolder(string name, Folder folder)
         {
-            get => files;
-            set
-            {
-                if (value == files) return;
-
-                files = value;
-                OnPropertyChanged(nameof(Files));
-            }
-        }
-
-        public BackupFolder(string name, BackupFolder[] folders, BackupFile[] files)
-        {
+            ParentId = null;
             Name = name;
-            Folders = folders;
-            Files = files;
-        }
-
-        public static BackupFolder FromPath(Folder folder, string name)
-        {
-            return FromPath(folder.GetDirectory(), folder.SubType, name);
-        }
-
-        public static BackupFolder FromPath(DirectoryInfo dir, SubfolderType subType, string name = null)
-        {
-            BackupFolder[] folders;
-            BackupFile[] files;
-
-            try
-            {
-                switch (subType)
-                {
-                    case SubfolderType.No:
-                        folders = new BackupFolder[0];
-                        files = new BackupFile[0];
-                        break;
-
-                    case SubfolderType.This:
-                        folders = new BackupFolder[0];
-                        files = dir.GetFiles().Select(BackupFile.FromPath).ToArray();
-                        break;
-
-                    case SubfolderType.All:
-                        folders = dir.GetDirectories().Select(d => FromPath(d, SubfolderType.All)).ToArray();
-                        files = dir.GetFiles().Select(BackupFile.FromPath).ToArray();
-                        break;
-
-                    default:
-                        throw new ArgumentOutOfRangeException(nameof(subType), subType, null);
-                }
-            }
-            catch
-            {
-                folders = new BackupFolder[0];
-                files = new BackupFile[0];
-            }
-
-            return new BackupFolder(name ?? dir.Name, folders, files);
+            Directory = folder.GetDirectory();
+            SubType = folder.SubType;
         }
 
         public override string ToString()
         {
             return Name;
-        }
-
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        private void OnPropertyChanged(string name)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
     }
 }

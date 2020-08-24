@@ -47,7 +47,7 @@
             </ListBox.ItemTemplate>
         </ListBox>
 
-        <Grid Grid.Row="1">
+        <Grid Grid.Row="1" Margin="0,5,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
@@ -58,18 +58,18 @@
             </Grid.ColumnDefinitions>
 
             <ToggleButton Grid.Column="0" Grid.Row="0" Name="btnChangeTimes" 
-                          Content="Change times" Width="100" Margin="5" 
+                          Content="Change times" Width="100" Margin="0,0,5,0" 
                           Checked="BtnChangeTimes_Checked" Unchecked="BtnChangeTimes_Unchecked"/>
 
-            <CheckBox Grid.Column="1" Margin="5,2" Content="Next Backup:" VerticalAlignment="Center"
+            <CheckBox Grid.Column="1" Margin="5,0,5,0" Content="Next Backup:" VerticalAlignment="Center"
                       IsChecked="{Binding IsBackupEnabled,Mode=TwoWay}"/>
             <TextBlock Grid.Column="2" Margin="0,2" VerticalAlignment="Center"
-                       Text="{Binding NextScheduledBackup, Converter={StaticResource dateTimeCon}}"/>
+                       Text="{Binding NextScheduledBackup,Converter={StaticResource dateTimeCon}}"/>
 
             <Button Grid.Column="4" Grid.Row="0" Content="Add" HorizontalAlignment="Left" 
-                    Margin="5" Width="100" Click="BtnAdd_Click"/>
+                    Margin="5,0,0,0" Width="100" Click="BtnAdd_Click"/>
             <Button Grid.Column="5" Grid.Row="0" Content="Remove" HorizontalAlignment="Left" 
-                    Margin="5" Width="100" DataContext="{Binding ElementName=lbxItems,Path=SelectedItem}"
+                    Margin="5,0,0,0" Width="100" DataContext="{Binding ElementName=lbxItems,Path=SelectedItem}"
                     IsEnabled="{Binding Converter={StaticResource truhy}}"
                     Click="BtnRemove_Click"/>
         </Grid>

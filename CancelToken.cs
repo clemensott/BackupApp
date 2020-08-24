@@ -1,10 +1,13 @@
-﻿using System.ComponentModel;
+﻿using System;
+using System.ComponentModel;
 
 namespace BackupApp
 {
     public class CancelToken : INotifyPropertyChanged
     {
         private bool isCanceled;
+
+        public event EventHandler Canceled;
 
         public bool IsCanceled
         {
@@ -14,6 +17,7 @@ namespace BackupApp
                 if (value == isCanceled) return;
 
                 isCanceled = value;
+                Canceled?.Invoke(this, EventArgs.Empty);
                 OnPropertyChanged(nameof(IsCanceled));
             }
         }

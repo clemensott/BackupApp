@@ -41,12 +41,12 @@
         <TabControl Grid.Row="2">
             <TabItem Header="Backup">
                 <Grid>
-                    <config:ConfigBackupControl Config="{Binding Config}"
+                    <config:ConfigBackupControl Margin="5" Config="{Binding Config}"
                                                 Visibility="{Binding BackupTask.IsBackuping,
                                                   Converter={StaticResource isNotTrueCon},
                                                   FallbackValue={StaticResource visible}}"/>
 
-                    <bakHandle:BackupHandlingControl Task="{Binding BackupTask}"
+                    <bakHandle:BackupHandlingControl Margin="5" Task="{Binding BackupTask}"
                                                      Visibility="{Binding BackupTask.IsBackuping,
                                                        Converter={StaticResource isTrueCon},
                                                        FallbackValue={StaticResource collapsed}}"/>

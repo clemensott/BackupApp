@@ -30,19 +30,19 @@
 
         <TextBlock Grid.Column="2" Grid.Row="0" Text="hh:mm:ss" HorizontalAlignment="Center"/>
         <TextBox Grid.Column="2" Grid.Row="2" Name="tbxNextTime" Width="100" 
-                 TextAlignment="Center" LostFocus="TbxNextTime_LostFocus"
-                 KeyUp="TbxNextTime_KeyUp"/>
+                 TextAlignment="Center" VerticalAlignment="Center"
+                 LostFocus="TbxNextTime_LostFocus" KeyUp="TbxNextTime_KeyUp"/>
 
         <TextBlock Grid.Column="4" Grid.Row="0" Text="Interval: d:hh:mm:ss"
-                       VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                   VerticalAlignment="Center" HorizontalAlignment="Center"/>
         <TextBox Grid.Column="4" Grid.Row="2" Name="tbxInterval"
-                 Width="150" HorizontalAlignment="Left" TextAlignment="Center"
+                 Width="150" HorizontalAlignment="Left" VerticalAlignment="Center" TextAlignment="Center"
                  LostFocus="TbxInterval_LostFocus" KeyUp="TbxInterval_KeyUp"/>
 
-        <Button Grid.Column="6" Grid.RowSpan="3" Content="OK" Width="100"
-                VerticalAlignment="Bottom" Click="BtnApplyTimes_Click"/>
+        <Button Grid.Column="6" Grid.Row="2" Content="OK" Width="100"
+                VerticalAlignment="Center" Click="BtnApplyTimes_Click"/>
 
-        <Button Grid.Column="8" Grid.RowSpan="3" Content="Cancel" Width="100"
-                VerticalAlignment="Bottom" Click="BtnCancelTimes_Click"/>
+        <Button Grid.Column="8" Grid.Row="2" Content="Cancel" Width="100"
+                VerticalAlignment="Center" Click="BtnCancelTimes_Click"/>
     </Grid>
 </UserControl>
