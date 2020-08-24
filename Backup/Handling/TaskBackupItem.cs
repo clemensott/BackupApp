@@ -47,19 +47,22 @@ namespace BackupApp.Backup.Handling
 
         public Folder Folder { get; }
 
+        public PathPattern[] ExcludePatterns { get; }
+
         public IList<string> AddedFiles { get; }
 
         public CancelToken CancelToken { get; }
 
         public BackupWriteDb DB { get; private set; }
 
-        public TaskBackupItem(string name, string filesDestFolderPath,
-            Folder folder, IList<string> addedFiles, CancelToken cancelToken)
+        public TaskBackupItem(string name, string filesDestFolderPath, Folder folder,
+            PathPattern[] excludePatterns, IList<string> addedFiles, CancelToken cancelToken)
         {
             allFiles = new List<BackupFile>();
             Name = name;
             FilesDestFolderPath = filesDestFolderPath;
             Folder = folder;
+            ExcludePatterns = excludePatterns;
             AddedFiles = addedFiles;
             CancelToken = cancelToken;
         }
@@ -78,7 +81,8 @@ namespace BackupApp.Backup.Handling
             while (folderQueue.Count > 0)
             {
                 BackupFolder currentFolder = folderQueue.Dequeue();
-                if (IsHidden(currentFolder.Directory)) continue;
+                if (IsHidden(currentFolder.Directory) ||
+                    ExcludePath(currentFolder.Directory.FullName + "\\")) continue;
 
                 long folderId = DB.AddFolder(currentFolder.Name, currentFolder.ParentId);
 
@@ -147,7 +151,8 @@ namespace BackupApp.Backup.Handling
         {
             try
             {
-                if (CancelToken.IsCanceled || DB.Disposed || IsHidden(file)) return;
+                if (CancelToken.IsCanceled || DB.Disposed ||
+                    IsHidden(file) || ExcludePath(file.FullName)) return;
 
                 string backupFileName;
                 string fileHash = GetHash(file.FullName);
@@ -173,6 +178,11 @@ namespace BackupApp.Backup.Handling
 
                 Progress = allFiles.Count > 0 ? Math.Round(currentCount / (double)allFiles.Count, 2) : 0;
             }
+        }
+
+        private bool ExcludePath(string path)
+        {
+            return ExcludePatterns.Any(p => p.Matches(path));
         }
 
         private static bool IsHidden(FileSystemInfo info)

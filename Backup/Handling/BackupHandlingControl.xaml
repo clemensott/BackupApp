@@ -4,6 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:BackupApp"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
              xmlns:con="clr-namespace:StdOttFramework.Converters;assembly=StdOttFrameworkLib"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
@@ -13,6 +14,7 @@
         <con:FalsyConverter x:Key="invCon"/>
         <con:VisibleHiddenConverter x:Key="visCon"/>
         <con:CollapsedVisibleConverter x:Key="colCon"/>
+        <sys:Double x:Key="zero">0</sys:Double>
     </UserControl.Resources>
 
     <Grid Name="gidMain" DataContext="{x:Null}">
@@ -74,7 +76,7 @@
                 <TextBlock Grid.Column="0" Grid.Row="0" Text="Folders:" 
                            Margin="0,0,10,0" VerticalAlignment="Center"/>
                 <Grid Grid.Column="1" Grid.Row="0" Margin="0,5,0,0" 
-                      DataContext="{Binding FoldersProgress,Mode=OneWay}">
+                      DataContext="{Binding FoldersProgress,Mode=OneWay,FallbackValue={StaticResource zero}}">
                     <ProgressBar Maximum="1" Value="{Binding Mode=OneWay}"/>
                     <TextBlock HorizontalAlignment="Center" 
                                Text="{Binding Mode=OneWay,Converter={StaticResource progressCon}}"/>
@@ -83,7 +85,7 @@
                 <TextBlock Grid.Column="0" Grid.Row="1" Text="Files:" 
                            Margin="0,0,10,0" VerticalAlignment="Center"/>
                 <Grid Grid.Column="1" Grid.Row="1" Margin="0,5,0,0" 
-                      DataContext="{Binding FilesProgress,Mode=OneWay}">
+                      DataContext="{Binding FilesProgress,Mode=OneWay,FallbackValue={StaticResource zero}}">
                     <ProgressBar Maximum="1" Value="{Binding Mode=OneWay}"/>
                     <TextBlock HorizontalAlignment="Center" 
                                Text="{Binding Mode=OneWay,Converter={StaticResource progressCon}}"/>
@@ -92,7 +94,7 @@
                 <TextBlock Grid.Column="0" Grid.Row="2" Text="Assosiations:"
                            Margin="0,0,10,0" VerticalAlignment="Center"/>
                 <Grid Grid.Column="1" Grid.Row="2" Margin="0,5,0,0" 
-                      DataContext="{Binding FoldersFilesProgress,Mode=OneWay}">
+                      DataContext="{Binding FoldersFilesProgress,Mode=OneWay,FallbackValue={StaticResource zero}}">
                     <ProgressBar Maximum="1" Value="{Binding Mode=OneWay}"/>
                     <TextBlock HorizontalAlignment="Center" 
                                Text="{Binding Mode=OneWay,Converter={StaticResource progressCon}}"/>

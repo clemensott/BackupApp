@@ -14,6 +14,7 @@
         <base:DateTimeConverter x:Key="dateTimeCon"/>
 
         <con:TruthyConverter x:Key="truhy"/>
+        <con:StringsToLinesConverter x:Key="stringsCon" RemoveEmptyLines="True"/>
     </UserControl.Resources>
 
     <Grid Name="gidMain" DataContext="{x:Null}" >
@@ -32,16 +33,36 @@
             <ListBox.ItemTemplate>
                 <DataTemplate>
                     <Grid Margin="0,2">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" MinWidth="200"/>
-                            <ColumnDefinition Width="*" MinWidth="500"/>
-                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
 
-                        <TextBox VerticalAlignment="Center" Margin="5"
-                                 Text="{Binding Name,Mode=TwoWay,UpdateSourceTrigger=LostFocus}"/>
-                        <ff:FolderPicker Grid.Column="1" VerticalAlignment="Center" IsRefreshButtonVisible="false"
-                                         AutoRefreshSelection="ForceFalse"
-                                         Folder="{Binding Folder,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" MinWidth="200"/>
+                                <ColumnDefinition Width="*" MinWidth="500"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBox VerticalAlignment="Center" Margin="5"
+                                     Text="{Binding Name,Mode=TwoWay,UpdateSourceTrigger=LostFocus}"/>
+                            <ff:FolderPicker Grid.Column="1" VerticalAlignment="Center" IsRefreshButtonVisible="false"
+                                             AutoRefreshSelection="ForceFalse"
+                                             Folder="{Binding Folder,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}"/>
+                        </Grid>
+
+                        <Grid Grid.Row="1" Margin="3">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0" Text="Exclude patterns:" Margin="0,0,5,0"/>
+                            <TextBox Grid.Column="1" AcceptsReturn="True" HorizontalAlignment="Stretch"
+                                     Text="{Binding ExcludePatterns,Mode=TwoWay,
+                                       UpdateSourceTrigger=LostFocus,
+                                       Converter={StaticResource stringsCon}}"/>
+                        </Grid>
                     </Grid>
                 </DataTemplate>
             </ListBox.ItemTemplate>

@@ -214,11 +214,17 @@ namespace BackupApp.LocalSave
         {
             BackupItem item = (BackupItem)sender;
 
-            if (e.PropertyName == nameof(item.Name)) Save();
-            else if (e.PropertyName == nameof(item.Folder))
+            switch (e.PropertyName)
             {
-                Subscribe(item.Folder);
-                Save();
+                case nameof(item.Name):
+                case nameof(item.ExcludePatterns):
+                    Save();
+                    break;
+
+                case nameof(item.Folder):
+                    Subscribe(item.Folder);
+                    Save();
+                    break;
             }
         }
 

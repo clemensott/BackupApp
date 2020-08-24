@@ -1,6 +1,7 @@
 ﻿using BackupApp.Backup.Config;
 using BackupApp.Backup.Result;
 using BackupApp.Helper;
+using StdOttStandard.Linq;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -134,7 +135,9 @@ namespace BackupApp.Backup.Handling
         private static TaskBackupItem ToTaskItem(BackupItem item, string filesDestFolderPath,
             IList<string> addedFiles, CancelToken cancelToken)
         {
-            return new TaskBackupItem(item.Name, filesDestFolderPath, item.Folder.Clone(), addedFiles, cancelToken);
+            PathPattern[] patterns = item.ExcludePatterns.ToNotNull().Select(p => new PathPattern(p)).ToArray();
+            return new TaskBackupItem(item.Name, filesDestFolderPath,
+                item.Folder.Clone(), patterns, addedFiles, cancelToken);
         }
 
         private async Task Run()
@@ -215,7 +218,6 @@ namespace BackupApp.Backup.Handling
                         DebugEvent.SaveText("CancelBackupDeleteAddedFileException", e.ToString());
                     }
                 }
-
             }
             catch (Exception e)
             {

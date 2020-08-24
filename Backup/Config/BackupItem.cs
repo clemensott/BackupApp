@@ -10,6 +10,7 @@ namespace BackupApp.Backup.Config
     {
         private string name;
         private Folder folder;
+        private string[] excludePatterns;
 
         public string Name
         {
@@ -44,6 +45,18 @@ namespace BackupApp.Backup.Config
                 OnPropertyChanged("Folder");
 
                 if (Name == "" && Folder != null) Name = Folder.Name;
+            }
+        }
+
+        public string[] ExcludePatterns
+        {
+            get => excludePatterns;
+            set
+            {
+                if (value == excludePatterns) return;
+
+                excludePatterns = value;
+                OnPropertyChanged(nameof(ExcludePatterns));
             }
         }
 
