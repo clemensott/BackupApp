@@ -201,7 +201,7 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\OrdnerDatei\FolderFileLib.csproj">
+    <ProjectReference Include="..\FolderFileLib\FolderFileLib.csproj">
       <Project>{0de5f7b2-633a-4acf-b6ad-df37bd9e68d9}</Project>
       <Name>FolderFileLib</Name>
     </ProjectReference>

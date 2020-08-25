@@ -5,7 +5,7 @@ VisualStudioVersion = 15.0.28307.329
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BackupApp", "BackupApp.csproj", "{1387D5AB-CE11-486F-9EEA-CA20DCE56F54}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FolderFileLib", "..\OrdnerDatei\FolderFileLib.csproj", "{0DE5F7B2-633A-4ACF-B6AD-DF37BD9E68D9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FolderFileLib", "..\FolderFileLib\FolderFileLib.csproj", "{0DE5F7B2-633A-4ACF-B6AD-DF37BD9E68D9}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StdOttFrameworkLib", "..\StdOttLib\StdOttFrameworkLib\StdOttFrameworkLib.csproj", "{D1334524-78A5-4D16-93BF-27A57C6DBE56}"
 EndProject
