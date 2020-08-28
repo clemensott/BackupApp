@@ -1,4 +1,5 @@
-﻿using BackupApp.Helper;
+﻿using BackupApp.Backup.Result;
+using BackupApp.Helper;
 using StdOttStandard.Linq;
 using System;
 using System.Collections.Generic;
@@ -31,12 +32,7 @@ namespace BackupApp.Restore
 
         public async Task<List<BackupFolder>> GetFolders(long? parentId = null)
         {
-            string sql = @"
-                SELECT id, name
-                FROM folders
-                WHERE parent_id = @parentId
-                ORDER BY name;
-            ";
+            string sql;
             IEnumerable<SQLiteParameter> parameters;
 
             if (parentId.HasValue)
@@ -124,12 +120,12 @@ namespace BackupApp.Restore
             }
         }
 
-        public async Task GetAllFiles(IDictionary<string, string> dict, CancelToken cancelToken = null)
+        public async Task ImportAllFiles(IDictionary<string, string> dict, CancelToken cancelToken = null)
         {
             const string sql = @"
-                SELECT hash, file_name
-                FROM files
-                WHERE id in (SELECT file_id FROM folders_files);
+                SELECT f.hash, f.file_name
+                FROM files f
+                         JOIN folders_files ff ON f.id = ff.file_id;
             ";
 
             SQLiteConnection connection = await GetConnection(Path);
@@ -148,6 +144,131 @@ namespace BackupApp.Restore
                     {
                         dict[reader.GetString(hashIndex)] = reader.GetString(fileNameIndex);
                     }
+                }
+            }
+            finally
+            {
+                ReleaseConnection();
+            }
+        }
+
+        public async Task<IList<DbFolder>> GetAllFolders(CancelToken cancelToken = null)
+        {
+            const string sql = @"
+                SELECT id, name, parent_id
+                FROM folders
+                ORDER BY id;
+            ";
+
+            SQLiteConnection connection = await GetConnection(Path);
+            try
+            {
+                if (cancelToken?.IsCanceled == true) return null;
+
+                using (DbDataReader reader = await connection.ExecuteReaderAsync(sql))
+                {
+                    if (cancelToken?.IsCanceled == true) return null;
+
+                    int idIndex = reader.GetOrdinal("id");
+                    int nameIndex = reader.GetOrdinal("name");
+                    int parentIdIndex = reader.GetOrdinal("parent_id");
+
+                    List<DbFolder> folders = new List<DbFolder>();
+                    while (await reader.ReadAsync())
+                    {
+                        if (cancelToken?.IsCanceled == true) return null;
+
+                        long id = reader.GetInt64(idIndex);
+                        string name = reader.GetString(nameIndex);
+                        long? parentId = reader.IsDBNull(parentIdIndex) ? (long?)null : reader.GetInt64(parentIdIndex);
+                        folders.Add(new DbFolder(id, parentId, name));
+                    }
+
+                    return folders;
+                }
+            }
+            finally
+            {
+                ReleaseConnection();
+            }
+        }
+
+        public async Task<IList<DbFile>> GetAllFiles(CancelToken cancelToken = null)
+        {
+            const string sql = @"
+                SELECT id, hash, file_name
+                FROM files
+                ORDER BY id;
+            ";
+
+            SQLiteConnection connection = await GetConnection(Path);
+            try
+            {
+                if (cancelToken?.IsCanceled == true) return null;
+
+                using (DbDataReader reader = await connection.ExecuteReaderAsync(sql))
+                {
+                    if (cancelToken?.IsCanceled == true) return null;
+
+                    int idIndex = reader.GetOrdinal("id");
+                    int hashIndex = reader.GetOrdinal("hash");
+                    int fileNameIndex = reader.GetOrdinal("file_name");
+
+                    List<DbFile> files = new List<DbFile>();
+                    while (await reader.ReadAsync())
+                    {
+                        if (cancelToken?.IsCanceled == true) return null;
+
+                        long id = reader.GetInt64(idIndex);
+                        string hash = reader.GetString(hashIndex);
+                        string fileName = reader.GetString(fileNameIndex);
+
+                        files.Add(new DbFile(id, hash, fileName));
+                    }
+
+                    return files;
+                }
+            }
+            finally
+            {
+                ReleaseConnection();
+            }
+        }
+
+        public async Task<IList<DbFolderFile>> GetAllFoldersFiles(CancelToken cancelToken = null)
+        {
+            const string sql = @"
+                SELECT folder_id, file_id, file_name
+                FROM folders_files
+                ORDER BY folder_id, file_id;
+            ";
+
+            SQLiteConnection connection = await GetConnection(Path);
+            try
+            {
+                if (cancelToken?.IsCanceled == true) return null;
+
+                using (DbDataReader reader = await connection.ExecuteReaderAsync(sql))
+                {
+                    if (cancelToken?.IsCanceled == true) return null;
+
+                    int folderIdIndex = reader.GetOrdinal("folder_id");
+                    int fileIdIndex = reader.GetOrdinal("file_id");
+                    int fileNameIndex = reader.GetOrdinal("file_name");
+
+                    List<DbFolderFile> foldersFiles = new List<DbFolderFile>();
+                    while (await reader.ReadAsync())
+                    {
+                        if (cancelToken?.IsCanceled == true) return null;
+
+                        long folderId = reader.GetInt64(folderIdIndex);
+                        long fileId = reader.GetInt64(fileIdIndex);
+                        string fileName = reader.GetString(fileNameIndex);
+
+                        foldersFiles.Add(new DbFolderFile(folderId, fileId, fileName));
+                    }
+
+                    return foldersFiles;
                 }
             }
             finally

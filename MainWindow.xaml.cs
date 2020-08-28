@@ -1,14 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Threading;
 using BackupApp.Backup.Config;
 using BackupApp.Backup.Handling;
-using BackupApp.Helper;
 using BackupApp.LocalSave;
 using BackupApp.Restore.Handling;
-using FolderFile;
 
 namespace BackupApp
 {
@@ -67,13 +66,15 @@ namespace BackupApp
                 btnStartBackup.IsEnabled = false;
 
                 string destFolderPath = viewModel.BackupDestFolder?.FullName;
-                if (string.IsNullOrWhiteSpace(destFolderPath)) return;
+                ICollection<BackupItem> backupItems = viewModel.Config?.BackupItems;
+                if (string.IsNullOrWhiteSpace(destFolderPath) || !Directory.Exists(destFolderPath) ||
+                    backupItems == null || backupItems.Count == 0) return;
 
-                BackupTask task = BackupTask.Run(destFolderPath, viewModel.Config?.BackupItems);
+                BackupTask task = BackupTask.Run(destFolderPath, backupItems);
                 viewModel.BackupTask = task;
 
-                await task.Task;
-                await bbc.ReloadBackups();
+                BackupTaskResult result = await task;
+                if (result == BackupTaskResult.Successful) await bbc.ReloadBackups();
             }
             finally
             {

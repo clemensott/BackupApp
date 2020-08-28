@@ -4,25 +4,19 @@ namespace BackupApp.Backup.Handling
 {
     public struct BackupFile
     {
-        public int FolderId  { get; set; }
+        public long FolderId { get; }
 
-        public FileInfo File { get; }
+        public FileInfo Info { get; }
 
-        public string Base64Hash { get; set; }
-
-        public BackupFile(FileInfo file) : this()
+        public BackupFile(long folderId, FileInfo file) : this()
         {
-            File = file;
-        }
-
-        public static BackupFile FromPath(FileInfo file)
-        {
-            return new BackupFile(file);
+            FolderId = folderId;
+            Info = file;
         }
 
         public override string ToString()
         {
-            return File.FullName;
+            return Info.FullName;
         }
     }
 }

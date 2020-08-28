@@ -3,10 +3,10 @@ using FolderFile;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
-using System.Security.Cryptography;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using BackupApp.Backup.Result;
+using BackupApp.Helper;
 
 namespace BackupApp.Backup.Handling
 {
@@ -15,7 +15,13 @@ namespace BackupApp.Backup.Handling
         private bool finished;
         private int currentCount;
         private double progress;
+        private readonly List<DbFolder> addedToDbFolders;
+        private readonly List<DbFile> addedToDbFiles;
+        private readonly List<DbFolderFile> addedToDbFoldersFiles;
         private readonly List<BackupFile> allFiles;
+        private readonly IList<string> addedFiles;
+        private readonly CancelToken cancelToken;
+        private BackupWriteDb db;
 
         public bool Finished
         {
@@ -49,28 +55,26 @@ namespace BackupApp.Backup.Handling
 
         public PathPattern[] ExcludePatterns { get; }
 
-        public IList<string> AddedFiles { get; }
-
-        public CancelToken CancelToken { get; }
-
-        public BackupWriteDb DB { get; private set; }
-
         public TaskBackupItem(string name, string filesDestFolderPath, Folder folder,
             PathPattern[] excludePatterns, IList<string> addedFiles, CancelToken cancelToken)
         {
+            addedToDbFolders = new List<DbFolder>();
+            addedToDbFiles = new List<DbFile>();
+            addedToDbFoldersFiles = new List<DbFolderFile>();
             allFiles = new List<BackupFile>();
+
             Name = name;
             FilesDestFolderPath = filesDestFolderPath;
             Folder = folder;
             ExcludePatterns = excludePatterns;
-            AddedFiles = addedFiles;
-            CancelToken = cancelToken;
+            this.addedFiles = addedFiles;
+            this.cancelToken = cancelToken;
         }
 
-        public Task BeginBackup(BackupWriteDb db)
+        public void BeginBackup(BackupWriteDb db)
         {
-            DB = db;
-            return Task.Run((Action)LoadFiles);
+            this.db = db;
+            LoadFiles();
         }
 
         public void LoadFiles()
@@ -84,7 +88,8 @@ namespace BackupApp.Backup.Handling
                 if (IsHidden(currentFolder.Directory) ||
                     ExcludePath(currentFolder.Directory.FullName + "\\")) continue;
 
-                long folderId = DB.AddFolder(currentFolder.Name, currentFolder.ParentId);
+                DbFolder dbFolder = db.AddFolder(currentFolder.Name, currentFolder.ParentId);
+                addedToDbFolders.Add(dbFolder);
 
                 IEnumerable<BackupFolder> folders;
                 IEnumerable<BackupFile> files;
@@ -99,13 +104,13 @@ namespace BackupApp.Backup.Handling
 
                         case SubfolderType.This:
                             folders = new BackupFolder[0];
-                            files = currentFolder.Directory.GetFiles().Select(BackupFile.FromPath);
+                            files = currentFolder.Directory.GetFiles().Select(f => new BackupFile(dbFolder.ID, f));
                             break;
 
                         case SubfolderType.All:
                             folders = currentFolder.Directory.GetDirectories()
-                                .Select(d => new BackupFolder(folderId, d, SubfolderType.All));
-                            files = currentFolder.Directory.GetFiles().Select(BackupFile.FromPath);
+                                .Select(d => new BackupFolder(dbFolder.ID, d, SubfolderType.All));
+                            files = currentFolder.Directory.GetFiles().Select(f => new BackupFile(dbFolder.ID, f));
                             break;
 
                         default:
@@ -135,11 +140,12 @@ namespace BackupApp.Backup.Handling
             currentCount = 0;
 
             try
-            {
-                Parallel.ForEach(allFiles,
-                    f => DoBackupFile(f.File, f.FolderId, backupedFiles));
 
-                allFiles.Clear();
+            {
+                Parallel.ForEach(allFiles, f => DoBackupFile(f, backupedFiles));
+
+                progress = 1;
+                OnPropertyChanged(nameof(Progress));
             }
             finally
             {
@@ -147,29 +153,37 @@ namespace BackupApp.Backup.Handling
             }
         }
 
-        private void DoBackupFile(FileInfo file, long folderId, BackupedFiles backupedFiles)
+        private void DoBackupFile(BackupFile file, BackupedFiles backupedFiles)
         {
             try
             {
-                if (CancelToken.IsCanceled ||
-                    IsHidden(file) || ExcludePath(file.FullName)) return;
+                if (cancelToken.IsCanceled ||
+                    IsHidden(file.Info) ||
+                    ExcludePath(file.Info.FullName)) return;
 
                 string backupFileName;
-                string fileHash = GetHash(file.FullName);
+                string fileHash = BackupUtils.GetHash(file.Info.FullName);
 
-                if (CancelToken.IsCanceled) return;
-
-                if (backupedFiles.Add(fileHash, file.Extension, out backupFileName))
+                if (cancelToken.IsCanceled) return;
+                if (backupedFiles.Add(fileHash, file.Info.Extension, out backupFileName))
                 {
                     string destPath = Path.Combine(FilesDestFolderPath, backupFileName);
 
-                    if (File.Exists(destPath)) File.Delete(destPath);
-                    File.Copy(file.FullName, destPath);
+                    do
+                    {
+                        File.Copy(file.Info.FullName, destPath, true);
+                    } while (fileHash != BackupUtils.GetHash(file.Info.FullName));
 
-                    AddedFiles.Add(destPath);
+                    addedFiles.Add(destPath);
                 }
 
-                DB.AddFile(file.Name, fileHash, backupFileName, folderId);
+                lock (addedToDbFoldersFiles)
+                {
+                    (DbFile? dbFile, DbFolderFile folderFile) = db.AddFile(file.Info.Name, fileHash, backupFileName, file.FolderId);
+
+                    if (dbFile.HasValue) addedToDbFiles.Add(dbFile.Value);
+                    addedToDbFoldersFiles.Add(folderFile);
+                }
             }
             catch { }
             finally
@@ -190,15 +204,29 @@ namespace BackupApp.Backup.Handling
             return ((int)info.Attributes & (int)FileAttributes.Hidden) > 0;
         }
 
-        private static string GetHash(string filePath)
+        public IEnumerable<DbFolder> GetAddedFolders()
         {
-            using (MD5 md5 = MD5.Create())
-            {
-                using (FileStream stream = File.OpenRead(filePath))
-                {
-                    return Convert.ToBase64String(md5.ComputeHash(stream)).Replace('/', '_');
-                }
-            }
+            return addedToDbFolders.AsReadOnly();
+        }
+
+        public IEnumerable<DbFile> GetAddedFiles()
+        {
+            return addedToDbFiles.AsReadOnly();
+        }
+
+        public IEnumerable<DbFolderFile> GetAddedFoldersFiles()
+        {
+            return addedToDbFoldersFiles.AsReadOnly();
+        }
+
+        // To reduce memory usage
+        public void Clean()
+        {
+            allFiles.Clear();
+            addedToDbFolders.Clear();
+            addedToDbFiles.Clear();
+            addedToDbFoldersFiles.Clear();
+            db = null;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;

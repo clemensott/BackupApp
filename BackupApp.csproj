@@ -102,6 +102,7 @@
       <DependentUpon>BackupTimesControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="Backup\Config\BackupConfig.cs" />
+    <Compile Include="Backup\Handling\BackupTaskResult.cs" />
     <Compile Include="Backup\Handling\PathPattern.cs" />
     <Compile Include="Restore\BackupFile.cs" />
     <Compile Include="Restore\BackupFolder.cs" />

@@ -1,7 +1,4 @@
-﻿using System;
-using System.ComponentModel;
-using System.IO;
-using System.Linq;
+﻿using System.IO;
 using FolderFile;
 
 namespace BackupApp.Backup.Handling

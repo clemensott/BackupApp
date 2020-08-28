@@ -145,31 +145,46 @@ namespace BackupApp
 
         private async Task ShowNotifyIcon(BackupTask task)
         {
+            int itemsCount = task.Items.Length;
             if (viewModel.IsHidden)
             {
-                int itemsCount = task.Items.Length;
                 string balloonTipText = itemsCount + (itemsCount == 1 ? " Directory" : " Directories");
 
                 notifyIcon.ShowBalloonTip(5000, "Backup started.", balloonTipText, ToolTipIcon.Info);
             }
 
-            await task.Task;
-
+            BackupTaskResult result = await task;
             if (!viewModel.IsHidden) return;
 
-            if (task.Failed)
+            TimeSpan backupTimeSpan = DateTime.Now - task.Started;
+            switch (result)
             {
-                notifyIcon.ShowBalloonTip(5000, "Backup failed.",
-                    task.FailedException.Message, ToolTipIcon.Error);
-            }
-            else
-            {
-                int itemsCount = task.Items.Length;
-                TimeSpan backupTimeSpan = DateTime.Now - task.Started;
-                string balloonTipText = itemsCount + (itemsCount == 1 ? " Directory\n" : " Directories\n") +
-                    ConvertTimeSpanToStringLong(backupTimeSpan);
+                case BackupTaskResult.Successful:
+                    string balloonTipText = itemsCount + (itemsCount == 1 ? " Directory\n" : " Directories\n") +
+                        ConvertTimeSpanToStringLong(backupTimeSpan);
 
-                notifyIcon.ShowBalloonTip(5000, "Backup finished.", balloonTipText, ToolTipIcon.Info);
+                    notifyIcon.ShowBalloonTip(5000, "Backup finished.", balloonTipText, ToolTipIcon.Info);
+                    break;
+
+                case BackupTaskResult.DestinationFolderNotFound:
+                    notifyIcon.ShowBalloonTip(5000, "Destination folder not found.", string.Empty, ToolTipIcon.Warning);
+                    break;
+
+                case BackupTaskResult.NoItemsToBackup:
+                    notifyIcon.ShowBalloonTip(5000, "No items to backup.", string.Empty, ToolTipIcon.Warning);
+                    break;
+
+                case BackupTaskResult.Exception:
+                    notifyIcon.ShowBalloonTip(5000, "Backup failed.", task.FailedException.Message, ToolTipIcon.Error);
+                    break;
+
+                case BackupTaskResult.ValidationError:
+                    notifyIcon.ShowBalloonTip(5000, "Validation of backup failed.", string.Empty, ToolTipIcon.Warning);
+                    break;
+
+                case BackupTaskResult.Canceled:
+                    notifyIcon.ShowBalloonTip(5000, "Backup got canceled.", string.Empty, ToolTipIcon.Warning);
+                    break;
             }
         }
 

@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Threading.Tasks;
 using BackupApp.Backup.Handling;
 using BackupApp.Backup.Result;
@@ -29,7 +30,7 @@ namespace BackupApp.Helper
             if (cache != null && ContainsSame(cache.GetDbNames(), dbNames)) return cache;
 
             IDictionary<string, string> files = new Dictionary<string, string>();
-            await Task.WhenAll(dbs.Select(db => db.GetAllFiles(files, cancelToken)));
+            await Task.WhenAll(dbs.Select(db => db.ImportAllFiles(files, cancelToken)));
 
             return new BackupedFiles(files, dbNames);
         }
@@ -130,6 +131,17 @@ namespace BackupApp.Helper
 
             return string.Format("{0:0000}-{1:00}-{2:00}_{3:00}-{4:00}-{5:00}",
                 dt.Year, dt.Month, dt.Day, dt.Hour, dt.Minute, dt.Second);
+        }
+
+        public static string GetHash(string filePath)
+        {
+            using (MD5 md5 = MD5.Create())
+            {
+                using (FileStream stream = File.OpenRead(filePath))
+                {
+                    return Convert.ToBase64String(md5.ComputeHash(stream)).Replace('/', '_');
+                }
+            }
         }
     }
 }

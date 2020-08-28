@@ -36,7 +36,7 @@ namespace BackupApp.Backup.Result
                 transaction);
 
             insertFoldersFilesCmd = new SQLiteCommand(
-                "INSERT INTO folders_files (file_name, folder_id, file_id) VALUES (@fileName, @folderId, @fileId);",
+                "INSERT INTO folders_files (folder_id, file_id, file_name) VALUES (@folderId, @fileId, @fileName);",
                 connection,
                 transaction);
 
@@ -63,10 +63,10 @@ namespace BackupApp.Backup.Result
 
                 CREATE TABLE folders_files
                 (
-                    id        INTEGER PRIMARY KEY AUTOINCREMENT,
-                    file_name TEXT    NOT NULL,
                     folder_id INTEGER NOT NULL,
                     file_id   INTEGER NOT NULL,
+                    file_name TEXT    NOT NULL,
+                    PRIMARY KEY (folder_id, file_id, file_name),
                     FOREIGN KEY (folder_id) REFERENCES folders (id),
                     FOREIGN KEY (file_id) REFERENCES files (id)
                 );
@@ -100,7 +100,7 @@ namespace BackupApp.Backup.Result
             }
         }
 
-        public long AddFolder(string name, long? parentId)
+        public DbFolder AddFolder(string name, long? parentId)
         {
             lock (insertFoldersCmd)
             {
@@ -109,31 +109,34 @@ namespace BackupApp.Backup.Result
                 insertFoldersCmd.Parameters.Add(DbHelper.GetParam("@parentId", parentId));
                 insertFoldersCmd.ExecuteNonQuery();
 
-                return lastFolderIndex;
+                return new DbFolder(lastFolderIndex, parentId, name);
             }
         }
 
-        public void AddFile(string name, string hash, string backupFileName, long folderId)
+        public (DbFile? file, DbFolderFile folderFile) AddFile(string name, string hash, string backupFileName, long folderId)
         {
+            DbFile? dbFile;
             long fileId;
-            lock (fileIds)
+            if (!fileIds.TryGetValue(hash, out fileId))
             {
-                if (!fileIds.TryGetValue(hash, out fileId))
-                {
-                    fileId = ++lastFileIndex;
-                    fileIds.Add(hash, fileId);
+                fileId = ++lastFileIndex;
+                fileIds.Add(hash, fileId);
 
-                    insertFilesCmd.Parameters.Add(DbHelper.GetParam("@id", fileId));
-                    insertFilesCmd.Parameters.Add(DbHelper.GetParam("@hash", hash));
-                    insertFilesCmd.Parameters.Add(DbHelper.GetParam("@fileName", backupFileName));
-                    insertFilesCmd.ExecuteNonQuery();
-                }
+                insertFilesCmd.Parameters.Add(DbHelper.GetParam("@id", fileId));
+                insertFilesCmd.Parameters.Add(DbHelper.GetParam("@hash", hash));
+                insertFilesCmd.Parameters.Add(DbHelper.GetParam("@fileName", backupFileName));
+                insertFilesCmd.ExecuteNonQuery();
 
-                insertFoldersFilesCmd.Parameters.Add(DbHelper.GetParam("@fileName", name));
-                insertFoldersFilesCmd.Parameters.Add(DbHelper.GetParam("@folderId", folderId));
-                insertFoldersFilesCmd.Parameters.Add(DbHelper.GetParam("@fileId", fileId));
-                insertFoldersFilesCmd.ExecuteNonQuery();
+                dbFile = new DbFile(fileId, hash, backupFileName);
             }
+            else dbFile = null;
+
+            insertFoldersFilesCmd.Parameters.Add(DbHelper.GetParam("@folderId", folderId));
+            insertFoldersFilesCmd.Parameters.Add(DbHelper.GetParam("@fileId", fileId));
+            insertFoldersFilesCmd.Parameters.Add(DbHelper.GetParam("@fileName", name));
+            insertFoldersFilesCmd.ExecuteNonQuery();
+
+            return (dbFile, new DbFolderFile(folderId, fileId, name));
         }
 
         public void Dispose()

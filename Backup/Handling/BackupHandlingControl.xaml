@@ -23,7 +23,7 @@
         </Grid.RowDefinitions>
 
         <ListBox ItemsSource="{Binding Items}"
-                 Visibility="{Binding IsFlushing,Converter={StaticResource colCon}}">
+                 Visibility="{Binding IsFinishing,Converter={StaticResource colCon}}">
             <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem">
                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -52,8 +52,8 @@
         <TextBlock Text="Is loading backuped files..." VerticalAlignment="Center" HorizontalAlignment="Center"
                    Visibility="{Binding IsLoadingBackupedFiles,Converter={StaticResource visCon}}"/>
 
-        <TextBlock Text="Is saving backup structure..." VerticalAlignment="Center" HorizontalAlignment="Center"
-                   Visibility="{Binding IsFlushing,Converter={StaticResource visCon}}"/>
+        <TextBlock Text="Is validating backup..." VerticalAlignment="Center" HorizontalAlignment="Center"
+                   Visibility="{Binding IsFinishing,Converter={StaticResource visCon}}"/>
 
         <Button Grid.Row="1" Content="Cancel" Width="100" Margin="5,5,0,0" HorizontalAlignment="Right"
                 IsEnabled="{Binding CancelToken.IsCanceled,Converter={StaticResource invCon}}"
