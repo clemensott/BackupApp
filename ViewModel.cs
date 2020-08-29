@@ -1,5 +1,6 @@
 ﻿using BackupApp.Backup.Config;
 using BackupApp.Backup.Handling;
+using BackupApp.Backup.Valitate;
 using BackupApp.Restore;
 using BackupApp.Restore.Handling;
 using FolderFile;
@@ -16,9 +17,9 @@ namespace BackupApp
         private bool isHidden;
         private DateTime? latestBackupDateTime;
         private Folder backupDestFolder;
-        private BackupConfig config;
         private BackupTask backupTask;
         private RestoreTask restoreTask;
+        private ValidationTask validationTask;
 
         public bool IsHidden
         {
@@ -56,17 +57,7 @@ namespace BackupApp
             }
         }
 
-        public BackupConfig Config
-        {
-            get => config;
-            set
-            {
-                if (value == config) return;
-
-                config = value;
-                OnPropertyChanged(nameof(Config));
-            }
-        }
+        public BackupConfig Config { get; }
 
         public BackupTask BackupTask
         {
@@ -89,6 +80,18 @@ namespace BackupApp
 
                 restoreTask = value;
                 OnPropertyChanged(nameof(RestoreTask));
+            }
+        }
+
+        public ValidationTask ValidationTask
+        {
+            get => validationTask;
+            set
+            {
+                if (value == validationTask) return;
+
+                validationTask = value;
+                OnPropertyChanged(nameof(ValidationTask));
             }
         }
 

@@ -1,6 +1,5 @@
 ﻿using System;
 using FolderFile;
-using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
@@ -10,11 +9,9 @@ using BackupApp.Helper;
 
 namespace BackupApp.Backup.Handling
 {
-    public class TaskBackupItem : INotifyPropertyChanged
+    public class TaskBackupItem : ProgressBase
     {
         private bool finished;
-        private int currentCount;
-        private double progress;
         private readonly List<DbFolder> addedToDbFolders;
         private readonly List<DbFile> addedToDbFiles;
         private readonly List<DbFolderFile> addedToDbFoldersFiles;
@@ -34,19 +31,7 @@ namespace BackupApp.Backup.Handling
                 OnPropertyChanged(nameof(Finished));
             }
         }
-
-        public double Progress
-        {
-            get => progress;
-            private set
-            {
-                if (Math.Abs(value - progress) < 0.01) return;
-
-                progress = value;
-                OnPropertyChanged(nameof(Progress));
-            }
-        }
-
+        
         public string Name { get; }
 
         public string FilesDestFolderPath { get; }
@@ -137,15 +122,11 @@ namespace BackupApp.Backup.Handling
 
         public void Backup(BackupedFiles backupedFiles)
         {
-            currentCount = 0;
-
             try
-
             {
+                Restart(allFiles.Count);
                 Parallel.ForEach(allFiles, f => DoBackupFile(f, backupedFiles));
-
-                progress = 1;
-                OnPropertyChanged(nameof(Progress));
+                SetProgress(1);
             }
             finally
             {
@@ -188,9 +169,7 @@ namespace BackupApp.Backup.Handling
             catch { }
             finally
             {
-                currentCount++;
-
-                Progress = allFiles.Count > 0 ? Math.Round(currentCount / (double)allFiles.Count, 2) : 0;
+                IncreaseProgressLocked();
             }
         }
 
@@ -227,13 +206,6 @@ namespace BackupApp.Backup.Handling
             addedToDbFiles.Clear();
             addedToDbFoldersFiles.Clear();
             db = null;
-        }
-
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        private void OnPropertyChanged(string name)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
     }
 }

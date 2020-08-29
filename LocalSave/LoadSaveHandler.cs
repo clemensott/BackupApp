@@ -51,10 +51,10 @@ namespace BackupApp.LocalSave
 
             try
             {
-                Settings settings = LoadSettings(path);
-
                 await Task.Run(() =>
                 {
+                    Settings settings = LoadSettings(path);
+
                     isHidden = settings.IsHidden;
                     isEnabled = settings.IsEnabled;
                     backupTimes = settings.BackupTimes;

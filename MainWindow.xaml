@@ -8,6 +8,7 @@
         xmlns:bakHandle="clr-namespace:BackupApp.Backup.Handling"
         xmlns:restore="clr-namespace:BackupApp.Restore"
         xmlns:reHandle="clr-namespace:BackupApp.Restore.Handling"
+        xmlns:val="clr-namespace:BackupApp.Backup.Valitate"
         xmlns:ff="clr-namespace:FolderFile;assembly=FolderFileLib"
         xmlns:con="clr-namespace:StdOttFramework.Converters;assembly=StdOttFrameworkLib"
         xmlns:win="clr-namespace:System.Windows;assembly=PresentationCore"
@@ -36,15 +37,19 @@
                          IsRefreshButtonVisible="false" AutoRefreshSelection="ForceFalse"
                          Folder="{Binding BackupDestFolder,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}"/>
 
-        <Button Grid.Row="0" Name="btnStartBackup" Content="Backup Now" HorizontalAlignment="Right"
-                Width="100" Margin="5" Click="BtnBackupNow_Click"/>
+        <StackPanel Grid.Row="0" HorizontalAlignment="Right" Orientation="Horizontal">
+            <Button Name="btnStartBackup" Content="Backup now"
+                    Width="150" Margin="5" Click="BtnBackupNow_Click"/>
+            
+            <Button Name="btnStartValidation" Content="Validate backups now"
+                    Width="150" Margin="5" Click="BtnValidateNow_Click"/>
+        </StackPanel>
 
         <TabControl Grid.Row="2">
             <TabItem Header="Contfig">
                 <config:ConfigBackupControl Margin="5" Config="{Binding Config}"/>
             </TabItem>
-            <TabItem Header="Backup" Visibility="{Binding BackupTask,
-                       Converter={StaticResource visCon},FallbackValue={StaticResource collapsed}}">
+            <TabItem Header="Backup" Visibility="{Binding BackupTask,Converter={StaticResource visCon}}">
                 <bakHandle:BackupHandlingControl Margin="5" Task="{Binding BackupTask}"/>
             </TabItem>
             <TabItem Header="Restore">
@@ -60,6 +65,9 @@
                                                      Converter={StaticResource isTrueCon},
                                                      FallbackValue={StaticResource collapsed}}"/>
                 </Grid>
+            </TabItem>
+            <TabItem Header="Validation" Visibility="{Binding ValidationTask,Converter={StaticResource visCon}}">
+                <val:ValidationHandlingContol Margin="5" Task="{Binding ValidationTask}"/>
             </TabItem>
         </TabControl>
     </Grid>

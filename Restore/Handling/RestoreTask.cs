@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.IO;
 using System.Threading.Tasks;
 using StdOttStandard.Linq;
@@ -10,11 +9,9 @@ using StdOttStandard.Linq.DataStructures;
 
 namespace BackupApp.Restore.Handling
 {
-    public class RestoreTask : INotifyPropertyChanged
+    public class RestoreTask : ProgressBase
     {
         private bool isRestoring;
-        private int totalCount, currentCount;
-        private double progress;
         private readonly AsyncQueue<string> errorQueue;
 
         public string DestFolder { get; }
@@ -36,18 +33,6 @@ namespace BackupApp.Restore.Handling
 
                 isRestoring = value;
                 OnPropertyChanged(nameof(IsRestoring));
-            }
-        }
-
-        public double Progress
-        {
-            get => progress;
-            private set
-            {
-                if (Math.Abs(value - progress) < 0.01) return;
-
-                progress = value;
-                OnPropertyChanged(nameof(Progress));
             }
         }
 
@@ -101,7 +86,7 @@ namespace BackupApp.Restore.Handling
                 await LoadAllFiles(Node);
                 if (CancelToken.IsCanceled) return;
 
-                totalCount = GetFilesCount(Node);
+                Restart(GetFilesCount(Node));
                 await Restore(Node, DestFolder, srcDirPath);
             }
             finally
@@ -143,7 +128,7 @@ namespace BackupApp.Restore.Handling
                 catch (Exception e)
                 {
                     await errorQueue.Enqueue("Create directory: " + currentPath + "\r\n" + e);
-                    IncreaseCurrentCount(GetFilesCount(node));
+                    IncreaseProgress(GetFilesCount(node));
                     return;
                 }
             }
@@ -168,7 +153,7 @@ namespace BackupApp.Restore.Handling
                     await errorQueue.Enqueue(destFilePath + "\r\n" + e);
                 }
 
-                IncreaseCurrentCount();
+                IncreaseProgress();
             }
 
             foreach (BackupFolder subFolder in node.Folders)
@@ -177,12 +162,6 @@ namespace BackupApp.Restore.Handling
 
                 await Restore(subFolder, currentPath, srcDirPath);
             }
-        }
-
-        private void IncreaseCurrentCount(int increase = 1)
-        {
-            currentCount += increase;
-            Progress = Math.Round(currentCount / (double)totalCount, 2);
         }
 
         private static int GetFilesCount(BackupFolder node)
@@ -216,13 +195,6 @@ namespace BackupApp.Restore.Handling
 
                 Errors.Insert(0, item);
             }
-        }
-
-        public event PropertyChangedEventHandler PropertyChanged;
-
-        private void OnPropertyChanged(string name)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
     }
 }

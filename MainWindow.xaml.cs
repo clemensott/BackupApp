@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Threading;
 using BackupApp.Backup.Config;
 using BackupApp.Backup.Handling;
+using BackupApp.Backup.Valitate;
 using BackupApp.LocalSave;
 using BackupApp.Restore.Handling;
 
@@ -16,7 +17,7 @@ namespace BackupApp
     /// </summary>
     public partial class MainWindow : Window
     {
-        private const string dataFilename = "Data.xml", restoreDbFilename = "D:\\restore_cache.db";
+        private const string dataFilename = "Data.xml";
 
         private ViewModel viewModel;
         private readonly DispatcherTimer timer;
@@ -50,36 +51,41 @@ namespace BackupApp
 
         private async Task CheckForBackup()
         {
-            DebugEvent.SaveText("CheckForBackup", "NextBackup: " + viewModel.Config?.NextScheduledBackup);
+            DebugEvent.SaveText("CheckForBackup", "NextBackup: " + viewModel.Config.NextScheduledBackup);
 
             BackupConfig config = viewModel.Config;
             if (config == null || config.NextScheduledBackup > DateTime.Now) return;
 
             BackupTask backupTask = viewModel.BackupTask;
             if (config.IsBackupEnabled && (backupTask == null || backupTask.Result.HasValue)) await BackupAsync();
-            else config.UpdateNextScheduledBackup();
         }
 
         private async Task BackupAsync()
         {
+            if (!btnStartBackup.IsEnabled) return;
+
             try
             {
-                btnStartBackup.IsEnabled = false;
+                btnStartBackup.IsEnabled = btnStartValidation.IsEnabled = false;
 
                 string destFolderPath = viewModel.BackupDestFolder?.FullName;
-                ICollection<BackupItem> backupItems = viewModel.Config?.BackupItems;
-                if (string.IsNullOrWhiteSpace(destFolderPath) || !Directory.Exists(destFolderPath) ||
-                    backupItems == null || backupItems.Count == 0) return;
+                ICollection<BackupItem> backupItems = viewModel.Config.BackupItems;
+
+                if (string.IsNullOrWhiteSpace(destFolderPath) ||
+                    !Directory.Exists(destFolderPath) ||
+                    backupItems == null ||
+                    backupItems.Count == 0) return;
 
                 BackupTask task = BackupTask.Run(destFolderPath, backupItems);
                 viewModel.BackupTask = task;
 
                 BackupTaskResult result = await task;
+                viewModel.Config.UpdateNextScheduledBackup();
                 if (result == BackupTaskResult.Successful) await bbc.ReloadBackups();
             }
             finally
             {
-                btnStartBackup.IsEnabled = true;
+                btnStartBackup.IsEnabled = btnStartValidation.IsEnabled = true;
             }
         }
 
@@ -93,6 +99,22 @@ namespace BackupApp
         private async void BtnBackupNow_Click(object sender, RoutedEventArgs e)
         {
             await BackupAsync();
+        }
+
+        private async void BtnValidateNow_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                btnStartBackup.IsEnabled = btnStartValidation.IsEnabled = false;
+
+                ValidationTask task = ValidationTask.Run(viewModel.BackupDestFolder?.FullName);
+                viewModel.ValidationTask = task;
+                await task;
+            }
+            finally
+            {
+                btnStartBackup.IsEnabled = btnStartValidation.IsEnabled = true;
+            }
         }
 
         private void BrowseBackupsControl_Restore(object sender, Restore.BackupFolder e)
