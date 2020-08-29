@@ -55,7 +55,8 @@ namespace BackupApp
             BackupConfig config = viewModel.Config;
             if (config == null || config.NextScheduledBackup > DateTime.Now) return;
 
-            if (config.IsBackupEnabled && viewModel.BackupTask?.IsBackuping != true) await BackupAsync();
+            BackupTask backupTask = viewModel.BackupTask;
+            if (config.IsBackupEnabled && (backupTask == null || backupTask.Result.HasValue)) await BackupAsync();
             else config.UpdateNextScheduledBackup();
         }
 

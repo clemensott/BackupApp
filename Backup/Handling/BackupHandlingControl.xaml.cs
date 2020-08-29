@@ -1,4 +1,5 @@
-﻿using System.Windows;
+﻿using StdOttStandard.Converter.MultipleInputs;
+using System.Windows;
 using System.Windows.Controls;
 
 namespace BackupApp.Backup.Handling
@@ -32,6 +33,14 @@ namespace BackupApp.Backup.Handling
         private void BtnCloseCancel_Click(object sender, RoutedEventArgs e)
         {
             Task.CancelToken.Cancel();
+        }
+
+        private object MultipleInputs3Converter_Convert(object sender, MultiplesInputsConvert3EventArgs args)
+        {
+            return false.Equals(args.Input0) && 
+                false.Equals(args.Input1) &&
+                ReferenceEquals(args.Input2, null) ? 
+                Visibility.Visible : Visibility.Collapsed;
         }
     }
 }

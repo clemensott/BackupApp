@@ -16,23 +16,13 @@ namespace BackupApp.Backup.Handling
 {
     public class BackupTask : INotifyPropertyChanged
     {
-        private bool isBackuping, isLoadingBackupedFiles, isFinishing;
+        private bool isLoadingBackupedFiles, isFinishing;
+        private TimeSpan? duration;
+        private BackupTaskResult? result;
         private Exception failedException;
         private BackupWriteDb dB;
         private Task<BackupTaskResult> task;
         private readonly IList<string> addedFiles;
-
-        public bool IsBackuping
-        {
-            get { return isBackuping; }
-            private set
-            {
-                if (value == isBackuping) return;
-
-                isBackuping = value;
-                OnPropertyChanged(nameof(IsBackuping));
-            }
-        }
 
         public bool IsFinishing
         {
@@ -55,6 +45,30 @@ namespace BackupApp.Backup.Handling
 
                 isLoadingBackupedFiles = value;
                 OnPropertyChanged(nameof(IsLoadingBackupedFiles));
+            }
+        }
+
+        public TimeSpan? Duration
+        {
+            get => duration;
+            private set
+            {
+                if (value == duration) return;
+
+                duration = value;
+                OnPropertyChanged(nameof(Duration));
+            }
+        }
+
+        public BackupTaskResult? Result
+        {
+            get => result;
+            private set
+            {
+                if (value == result) return;
+
+                result = value;
+                OnPropertyChanged(nameof(Result));
             }
         }
 
@@ -119,25 +133,32 @@ namespace BackupApp.Backup.Handling
 
         private async Task<BackupTaskResult> Run()
         {
+            BackupTaskResult result = BackupTaskResult.Exception;
             Started = DateTime.Now;
             DebugEvent.SaveText("Backup");
 
             try
             {
-                IsBackuping = true;
-                if (!Directory.Exists(DestFolderPath)) return BackupTaskResult.DestinationFolderNotFound;
-                if (Items == null || Items.Length == 0) return BackupTaskResult.NoItemsToBackup;
-
-                return await Backup();
+                return result = await Backup();
+            }
+            catch (Exception e)
+            {
+                result = BackupTaskResult.Exception;
+                FailedException = e;
+                throw;
             }
             finally
             {
-                IsBackuping = false;
+                Duration = DateTime.Now - Started;
+                Result = result;
             }
         }
 
         private async Task<BackupTaskResult> Backup()
         {
+            if (!Directory.Exists(DestFolderPath)) return BackupTaskResult.DestinationFolderNotFound;
+            if (Items == null || Items.Length == 0) return BackupTaskResult.NoItemsToBackup;
+
             BackupTaskResult result;
             string destDbPath = null;
             DebugEvent.SaveText("HandleBackup");

@@ -74,7 +74,7 @@ namespace BackupApp
             try
             {
                 BackupTask backupTask = viewModel.BackupTask;
-                if (backupTask != null && backupTask.IsBackuping) notifyIcon.Text = "Is Backuping";
+                if (backupTask != null && !backupTask.Result.HasValue) notifyIcon.Text = "Is Backuping";
                 else
                 {
                     BackupConfig config = viewModel.Config;
