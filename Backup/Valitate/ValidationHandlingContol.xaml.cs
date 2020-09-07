@@ -40,5 +40,10 @@ namespace BackupApp.Backup.Valitate
                 state != ValidationState.Finished ?
                 Visibility.Visible : Visibility.Collapsed;
         }
+
+        private void BtnCloseCancel_Click(object sender, RoutedEventArgs e)
+        {
+            Task?.CancelToken.Cancel();
+        }
     }
 }

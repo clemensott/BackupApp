@@ -105,7 +105,8 @@
     <Compile Include="Backup\Handling\BackupTaskResult.cs" />
     <Compile Include="Backup\Handling\PathPattern.cs" />
     <Compile Include="Backup\Valitate\BackupedFile.cs" />
-    <Compile Include="Backup\Valitate\ErrorFile.cs" />
+    <Compile Include="Backup\Valitate\DbErrorFiles.cs" />
+    <Compile Include="Backup\Valitate\DbErrorFile.cs" />
     <Compile Include="Backup\Valitate\ValidationHandlingContol.xaml.cs">
       <DependentUpon>ValidationHandlingContol.xaml</DependentUpon>
     </Compile>

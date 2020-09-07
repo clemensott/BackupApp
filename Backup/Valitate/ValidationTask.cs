@@ -14,11 +14,11 @@ namespace BackupApp.Backup.Valitate
     public class ValidationTask : ProgressBase
     {
         private bool isCompleted;
-        private int? unusedFilesCount, deletedFilesCount;
+        private int? unusedFilesCount, deletedFilesCount, missingFilesCount;
         private ValidationState state;
         private Exception failedException;
         private Task task;
-        private IEnumerable<ErrorFile> errorFiles;
+        private IEnumerable<DbErrorFiles> errorFiles;
         private readonly object lockObj = new object();
 
         public bool IsCompleted
@@ -69,6 +69,18 @@ namespace BackupApp.Backup.Valitate
             }
         }
 
+        public int? MissingFilesCount
+        {
+            get => missingFilesCount;
+            set
+            {
+                if (value == missingFilesCount) return;
+
+                missingFilesCount = value;
+                OnPropertyChanged(nameof(MissingFilesCount));
+            }
+        }
+
         public Exception FailedException
         {
             get { return failedException; }
@@ -81,7 +93,7 @@ namespace BackupApp.Backup.Valitate
             }
         }
 
-        public IEnumerable<ErrorFile> ErrorFiles
+        public IEnumerable<DbErrorFiles> ErrorFiles
         {
             get => errorFiles;
             private set
@@ -151,8 +163,17 @@ namespace BackupApp.Backup.Valitate
                 }
 
                 State = ValidationState.LoadingHashes;
-                BackupedFile[] usedBackupedFiles = backupedFiles.Values.Where(bf => bf.DbHashes.Count > 0).ToArray();
-                Restart(usedBackupedFiles.Length);
+                List<BackupedFile> usedBackupedFiles = new List<BackupedFile>();
+                List<string> unusedFiles = new List<string>();
+
+                foreach (BackupedFile backupedFile in backupedFiles.Values)
+                {
+                    if (backupedFile.DbHashes.Count > 0) usedBackupedFiles.Add(backupedFile);
+                    else unusedFiles.Add(backupedFile.Path);
+                }
+
+                Restart(usedBackupedFiles.Count);
+                UnusedFilesCount = unusedFiles.Count;
 
                 Parallel.ForEach(usedBackupedFiles, bf =>
                 {
@@ -160,7 +181,7 @@ namespace BackupApp.Backup.Valitate
 
                     try
                     {
-                        bf.Hash = BackupUtils.GetHash(bf.Path);
+                        if (bf.Exists) bf.Hash = BackupUtils.GetHash(bf.Path);
                     }
                     catch { }
                     finally
@@ -170,16 +191,33 @@ namespace BackupApp.Backup.Valitate
                 });
 
                 State = ValidationState.SearchingErrorFiles;
-                ErrorFiles = backupedFiles.Values.Where(IsErrorFile).Select(ErrorFile.Create).ToArray();
+                int missingFilesCount = 0;
+                IDictionary<string, DbErrorFiles> errorLookup = new Dictionary<string, DbErrorFiles>();
+
+                foreach (BackupedFile backupedFile in usedBackupedFiles)
+                {
+                    if (!backupedFile.Exists) missingFilesCount++;
+
+                    foreach (KeyValuePair<string, IReadOnlyList<BackupReadDb>> pair in backupedFile.DbHashes)
+                    {
+                        if (backupedFile.Hash == pair.Key) continue;
+
+                        string fileName = Path.GetFileName(backupedFile.Path);
+                        foreach (BackupReadDb db in pair.Value)
+                        {
+                            string dbFileName = Path.GetFileName(db.Path);
+
+                            errorLookup.GetOrAdd(dbFileName, () => new DbErrorFiles(dbFileName))
+                                .Add(fileName, backupedFile.Hash, pair.Key);
+                        }
+                    }
+                }
+
+                ErrorFiles = errorLookup.Values.ToArray();
+                MissingFilesCount = missingFilesCount;
 
                 State = ValidationState.DeletingUnusedFiles;
-
-                string[] unusedFiles = backupedFiles.Values
-                    .Where(bf => string.IsNullOrWhiteSpace(bf.Hash))
-                    .Select(bf => bf.Path).ToArray();
-
-                UnusedFilesCount = unusedFiles.Length;
-                Restart(unusedFiles.Length);
+                Restart(unusedFiles.Count);
 
                 int deletedFilesCount = 0;
                 foreach (string filePath in unusedFiles)

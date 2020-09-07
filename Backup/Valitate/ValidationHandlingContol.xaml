@@ -6,6 +6,7 @@
              xmlns:local="clr-namespace:BackupApp.Backup.Valitate"
              xmlns:base="clr-namespace:BackupApp"
              xmlns:con="clr-namespace:StdOttFramework.Converters;assembly=StdOttFrameworkLib"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
 
@@ -14,6 +15,9 @@
         <con:ValueConverter x:Key="isRunningVisCon" ConvertEvent="IsRunningConverter_ConvertEvent"/>
         <con:CollapsedVisibleConverter x:Key="colCon" />
         <con:CollapsedVisibleConverter x:Key="isNullColCon" DecideType="IsNull"/>
+        <con:FalsyConverter x:Key="invCon"/>
+
+        <sys:String x:Key="missingFileHashFallback">&lt;Missing&gt;</sys:String>
     </UserControl.Resources>
 
     <Grid Name="gidMain" DataContext="{x:Null}">
@@ -21,33 +25,51 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,5"
-                    HorizontalAlignment="Left" VerticalAlignment="Center">
-            <TextBlock FontSize="15" Text="State:" VerticalAlignment="Center" Margin="0,0,5,0"/>
-            <TextBlock FontSize="17" FontWeight="SemiBold" Text="{Binding State}" />
-        </StackPanel>
-
-        <Grid Margin="0,5" HorizontalAlignment="Right"
-              Visibility="{Binding UnusedFilesCount,Converter={StaticResource isNullColCon}}">
+        <Grid>
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
             </Grid.ColumnDefinitions>
 
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto" />
-                <RowDefinition Height="Auto" />
-            </Grid.RowDefinitions>
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,5"
+                        HorizontalAlignment="Left" VerticalAlignment="Center">
+                <TextBlock FontSize="15" Text="State:" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                <TextBlock FontSize="17" FontWeight="SemiBold" Text="{Binding State}" />
+            </StackPanel>
 
-            <TextBlock Grid.Row="0" Text="Unused files:" Margin="0,1,5,1"/>
-            <TextBlock Grid.Column="1" Grid.Row="0" Margin="0,2" Text="{Binding UnusedFilesCount}"/>
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="10,0" VerticalAlignment="Center"
+                        Visibility="{Binding MissingFilesCount,Converter={StaticResource isNullColCon}}">
+                <TextBlock Text="Missing files:" Margin="0,0,5,0"/>
+                <TextBlock Text="{Binding MissingFilesCount}"/>
+            </StackPanel>
 
-            <TextBlock Grid.Row="1" Text="Deleted files:" Margin="0,1,5,1"
-                       Visibility="{Binding DeletedFilesCount,Converter={StaticResource isNullColCon}}"/>
-            <TextBlock Grid.Column="1" Grid.Row="1" Margin="0,2" Text="{Binding DeletedFilesCount}"
-                       Visibility="{Binding DeletedFilesCount,Converter={StaticResource isNullColCon}}"/>
+            <Grid Grid.Column="3" Margin="0,5" HorizontalAlignment="Right"
+                  Visibility="{Binding UnusedFilesCount,Converter={StaticResource isNullColCon}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Text="Unused files:" Margin="0,1,5,1"/>
+                <TextBlock Grid.Column="1" Grid.Row="0" Margin="0,2"
+                           HorizontalAlignment="Right" Text="{Binding UnusedFilesCount}"/>
+
+                <TextBlock Grid.Row="1" Text="Deleted files:" Margin="0,1,5,1" 
+                           Visibility="{Binding DeletedFilesCount,Converter={StaticResource isNullColCon}}"/>
+                <TextBlock Grid.Column="1" Grid.Row="1" Margin="0,2"
+                           HorizontalAlignment="Right" Text="{Binding DeletedFilesCount}"
+                           Visibility="{Binding DeletedFilesCount,Converter={StaticResource isNullColCon}}"/>
+            </Grid>
         </Grid>
 
         <Grid Grid.Row="1" Margin="0,5"
@@ -57,7 +79,7 @@
                        Text="{Binding Progress,Mode=OneWay,Converter={StaticResource progressCon}}"/>
         </Grid>
 
-        <Grid Grid.Row="3" Margin="0,5,0,0"
+        <Grid Grid.Row="2" Margin="0,5,0,0"
               Visibility="{Binding ErrorFiles,Converter={StaticResource isNullColCon}}">
 
             <TreeView ItemsSource="{Binding ErrorFiles}">
@@ -66,10 +88,7 @@
                         <TreeViewItem ItemsSource="{Binding}">
                             <TreeViewItem.Header>
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding FileName}" Margin="0,0,3,0"/>
-                                    <TextBlock Text="("/>
-                                    <TextBlock Text="{Binding Hash}"/>
-                                    <TextBlock Text=")" Margin="0,0,3,0"/>
+                                    <TextBlock Text="{Binding DbFileName}" FontWeight="SemiBold" Margin="0,0,3,0"/>
                                     <TextBlock Text="("/>
                                     <TextBlock Text="{Binding Count}"/>
                                     <TextBlock Text=")"/>
@@ -77,13 +96,17 @@
                             </TreeViewItem.Header>
                             <TreeViewItem.ItemTemplate>
                                 <DataTemplate>
-                                    <TreeViewItem ItemsSource="{Binding Value}">
+                                    <TreeViewItem ItemsSource="{Binding}">
                                         <TreeViewItem.Header>
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock Text="{Binding Key}" Margin="0,0,3,0"/>
-                                                <TextBlock Text="("/>
-                                                <TextBlock Text="{Binding Value.Length}"/>
-                                                <TextBlock Text=")"/>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding FileName}"/>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock FontStyle="Italic" Text="{Binding BackupedFileHash,
+                                                                 TargetNullValue={StaticResource missingFileHashFallback}}"/>
+                                                    <TextBlock Text="(" Margin="3,0,0,0"/>
+                                                    <TextBlock Text="{Binding Count}"/>
+                                                    <TextBlock Text=")"/>
+                                                </StackPanel>
                                             </StackPanel>
                                         </TreeViewItem.Header>
                                     </TreeViewItem>
@@ -97,5 +120,10 @@
             <TextBlock Text="&lt;No invalid files&gt;" Margin="5" FontStyle="Italic"
                        Visibility="{Binding ErrorFiles.Count,Converter={StaticResource colCon}}"/>
         </Grid>
+
+        <Button Grid.Row="3" Content="Cancel" Width="100" Margin="5,5,0,0" HorizontalAlignment="Right"
+                IsEnabled="{Binding CancelToken.IsCanceled,Converter={StaticResource invCon}}"
+                Visibility="{Binding IsCompleted,Converter={StaticResource colCon}}"
+                Click="BtnCloseCancel_Click"/>
     </Grid>
 </UserControl>
