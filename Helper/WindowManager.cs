@@ -148,30 +148,31 @@ namespace BackupApp
             int itemsCount = task.Items.Length;
             if (viewModel.IsHidden)
             {
-                string balloonTipText = itemsCount + (itemsCount == 1 ? " Directory" : " Directories");
+                string balloonTipTextBegin = itemsCount + (itemsCount == 1 ? " Directory" : " Directories");
 
-                notifyIcon.ShowBalloonTip(5000, "Backup started.", balloonTipText, ToolTipIcon.Info);
+                notifyIcon.ShowBalloonTip(5000, "Backup started.", balloonTipTextBegin, ToolTipIcon.Info);
             }
 
             BackupTaskResult result = await task;
             if (!viewModel.IsHidden) return;
 
             TimeSpan backupTimeSpan = DateTime.Now - task.Started;
+            string balloonTipTextEnd = itemsCount + (itemsCount == 1 ? " Directory\n" : " Directories\n") +
+                ConvertTimeSpanToStringLong(backupTimeSpan);
+
             switch (result)
             {
                 case BackupTaskResult.Successful:
-                    string balloonTipText = itemsCount + (itemsCount == 1 ? " Directory\n" : " Directories\n") +
-                        ConvertTimeSpanToStringLong(backupTimeSpan);
 
-                    notifyIcon.ShowBalloonTip(5000, "Backup finished.", balloonTipText, ToolTipIcon.Info);
+                    notifyIcon.ShowBalloonTip(5000, "Backup finished.", balloonTipTextEnd, ToolTipIcon.Info);
                     break;
 
                 case BackupTaskResult.DestinationFolderNotFound:
-                    notifyIcon.ShowBalloonTip(5000, "Destination folder not found.", string.Empty, ToolTipIcon.Warning);
+                    notifyIcon.ShowBalloonTip(5000, "Destination folder not found.", balloonTipTextEnd, ToolTipIcon.Warning);
                     break;
 
                 case BackupTaskResult.NoItemsToBackup:
-                    notifyIcon.ShowBalloonTip(5000, "No items to backup.", string.Empty, ToolTipIcon.Warning);
+                    notifyIcon.ShowBalloonTip(5000, "No items to backup.", balloonTipTextEnd, ToolTipIcon.Warning);
                     break;
 
                 case BackupTaskResult.Exception:
@@ -179,11 +180,11 @@ namespace BackupApp
                     break;
 
                 case BackupTaskResult.ValidationError:
-                    notifyIcon.ShowBalloonTip(5000, "Validation of backup failed.", string.Empty, ToolTipIcon.Warning);
+                    notifyIcon.ShowBalloonTip(5000, "Validation of backup failed.", balloonTipTextEnd, ToolTipIcon.Warning);
                     break;
 
                 case BackupTaskResult.Canceled:
-                    notifyIcon.ShowBalloonTip(5000, "Backup got canceled.", string.Empty, ToolTipIcon.Warning);
+                    notifyIcon.ShowBalloonTip(5000, "Backup got canceled.", balloonTipTextEnd, ToolTipIcon.Warning);
                     break;
             }
         }
