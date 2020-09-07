@@ -7,13 +7,22 @@ namespace BackupApp.Backup.Handling
 {
     public class BackupedFiles
     {
-        private readonly IDictionary<string, string> hashes, fileNames;
+        public readonly IDictionary<string, string> hashes, fileNames, missingFileNames;
         private readonly List<string> dbNames;
 
-        public BackupedFiles(IDictionary<string, string> hashes, IEnumerable<string> dbNames)
+        public BackupedFiles(IDictionary<string, string> hashes, IEnumerable<string> existingFileNames, IEnumerable<string> dbNames)
         {
             this.hashes = hashes;
             fileNames = hashes.Values.ToDictionary(v => Path.GetFileNameWithoutExtension(v));
+            missingFileNames = hashes.Values.ToDictionary(f => f);
+
+            foreach (string existingFileName in existingFileNames)
+            {
+                if (missingFileNames.ContainsKey(existingFileName))
+                {
+                    missingFileNames.Remove(existingFileName);
+                }
+            }
 
             this.dbNames = dbNames.ToList();
         }
@@ -22,7 +31,11 @@ namespace BackupApp.Backup.Handling
         {
             lock (hashes)
             {
-                if (hashes.TryGetValue(hash, out backupFileName)) return false;
+                if (hashes.TryGetValue(hash, out backupFileName))
+                {
+                    if (missingFileNames.ContainsKey(backupFileName)) { }
+                    return missingFileNames.ContainsKey(backupFileName);
+                }
 
                 backupFileName = GetRandomFileName(extension);
                 hashes.Add(hash, backupFileName);
@@ -49,7 +62,7 @@ namespace BackupApp.Backup.Handling
             dbNames.Add(dbName);
         }
 
-        public IEnumerable<KeyValuePair<string,string>> GetFilePairs()
+        public IEnumerable<KeyValuePair<string, string>> GetFilePairs()
         {
             return hashes;
         }

@@ -23,16 +23,22 @@ namespace BackupApp.Helper
 
         public async static Task<BackupedFiles> GetBackupedFiles(string folderPath, CancelToken cancelToken = null)
         {
+            IDictionary<string, string> hashes;
+            IList<string> cacheDbNames;
             BackupReadDb[] dbs = GetReadDBs(folderPath).ToNotNull().ToArray();
             IEnumerable<string> dbNames = dbs.Select(db => Path.GetFileName(db.Path));
-            BackupedFiles cache = LoadLocalBackupedFilesCache();
 
-            if (cache != null && ContainsSame(cache.GetDbNames(), dbNames)) return cache;
+            if (!TryLoadLocalBackupedFilesCache(out hashes, out cacheDbNames) || !ContainsSame(cacheDbNames, dbNames))
+            {
+                hashes = new Dictionary<string, string>();
+                await Task.WhenAll(dbs.Select(db => db.ImportAllFiles(hashes, cancelToken)));
+            }
 
-            IDictionary<string, string> files = new Dictionary<string, string>();
-            await Task.WhenAll(dbs.Select(db => db.ImportAllFiles(files, cancelToken)));
+            IEnumerable<string> existingFileNames = Directory
+                .EnumerateFiles(GetBackupedFilesFolderPath(folderPath))
+                .Select(p => Path.GetFileName(p));
 
-            return new BackupedFiles(files, dbNames);
+            return new BackupedFiles(hashes, existingFileNames, dbNames);
         }
 
         private static bool ContainsSame(IEnumerable<string> src1, IEnumerable<string> src2)
@@ -40,31 +46,34 @@ namespace BackupApp.Helper
             return src1.OrderBy(v => v).SequenceEqual(src2.OrderBy(v => v));
         }
 
-        private static BackupedFiles LoadLocalBackupedFilesCache()
+        private static bool TryLoadLocalBackupedFilesCache(out IDictionary<string, string> hashes, out IList<string> dbNames)
         {
             try
             {
-                if (!File.Exists(localBackupedFilesCacheFileName)) return null;
-
-                string[] lines = File.ReadAllLines(localBackupedFilesCacheFileName);
-
-                List<string> dbNames = new List<string>();
-                Dictionary<string, string> hashes = new Dictionary<string, string>();
-
-                foreach (string line in lines)
+                if (File.Exists(localBackupedFilesCacheFileName))
                 {
-                    string[] parts = line.Split('|');
 
-                    if (parts.Length == 1) dbNames.Add(parts[0]);
-                    else hashes.Add(parts[0], parts[1]);
+                    string[] lines = File.ReadAllLines(localBackupedFilesCacheFileName);
+
+                    dbNames = new List<string>();
+                    hashes = new Dictionary<string, string>();
+
+                    foreach (string line in lines)
+                    {
+                        string[] parts = line.Split('|');
+
+                        if (parts.Length == 1) dbNames.Add(parts[0]);
+                        else hashes.Add(parts[0], parts[1]);
+                    }
+
+                    return true;
                 }
+            }
+            catch { }
 
-                return new BackupedFiles(hashes, dbNames);
-            }
-            catch
-            {
-                return null;
-            }
+            hashes = null;
+            dbNames = null;
+            return false;
         }
 
         public static void SaveLocalBackupedFilesCache(BackupedFiles backupedFiles)
